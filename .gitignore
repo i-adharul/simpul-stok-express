@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Secrets: only .env-template.txt is committed
+.env
+
+# Local working notes and assistant settings
+notes/
+.claude/
+
+# Build output and logs
+dist/
+*.log
+
+# OS files
+.DS_Store
