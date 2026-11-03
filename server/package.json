@@ -4,7 +4,7 @@
   "description": "Simpul Stok API (Express 5, Sequelize 6)",
   "main": "app.js",
   "scripts": {
-    "test": "jest --runInBand --passWithNoTests",
+    "test": "jest --runInBand",
     "dev": "nodemon bin/www.js",
     "start": "node bin/www.js"
   },
