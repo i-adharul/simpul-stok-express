@@ -14,7 +14,7 @@ A sibling implementation of the same product (Next.js, TypeScript, Prisma) lives
 
 ## Status
 
-Work in progress. The repository skeleton is being set up (epic E0). There is nothing to run yet.
+Work in progress (epic E0, repository setup). The API answers every request with a JSON `404` because no routes exist yet. The client and the database are not set up yet.
 
 ## Stack
 
@@ -28,9 +28,20 @@ client/   React + Vite client
 docs/     Product and technical documents, and decisions/ (ADRs)
 ```
 
+## Run the server
+
+Requires Node.js 18 or higher.
+
+```bash
+cd server
+npm install
+npm run dev     # nodemon, http://localhost:3000
+npm test        # Jest and Supertest, one test file at a time
+```
+
 ## Documentation
 
-Start with [docs/README.md](docs/README.md). The UI is in Indonesian; code and documents are in English.
+Start with [docs/README.md](docs/README.md). Architecture decisions are in [docs/decisions/](docs/decisions/). The UI is in Indonesian; code and documents are in English.
 
 ## Payments
 
