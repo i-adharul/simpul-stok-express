@@ -1,7 +1,6 @@
+// env must load first: a bad configuration stops the process before anything else runs.
+const { PORT } = require("../config/env");
 const app = require("../app");
-
-// Temporary: moves to the validated env object when config/env.js exists.
-const PORT = 3000;
 
 // Express 5 passes a listen failure (for example EADDRINUSE) to this callback.
 app.listen(PORT, (error) => {
