@@ -1,4 +1,5 @@
 const { getSequelize } = require("../support/db");
+const { constraintOf } = require("../support/constraintOf");
 
 const insertPlan = (overrides = {}) => {
   const plan = {
@@ -16,17 +17,6 @@ const insertPlan = (overrides = {}) => {
   );
 };
 
-// Sequelize turns a unique violation into a generic "Validation error";
-// the constraint name stays on the original driver error.
-const constraintOf = async (promise) => {
-  try {
-    await promise;
-  } catch (error) {
-    return error.parent.constraint;
-  }
-  return undefined;
-};
-
 describe("Plans table", () => {
   beforeEach(async () => {
     await getSequelize().query('DELETE FROM "Plans"');
@@ -42,7 +32,9 @@ describe("Plans table", () => {
   });
 
   it("refuses a negative price", async () => {
-    expect(await constraintOf(insertPlan({ priceIdr: -1 }))).toBe("Plans_priceIdr_check");
+    expect(await constraintOf(insertPlan({ priceIdr: -1 }))).toBe(
+      "Plans_priceIdr_check",
+    );
   });
 
   it.each(["maxWarehouses", "maxProducts", "maxMembers"])(
