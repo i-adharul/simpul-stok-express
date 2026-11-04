@@ -1,7 +1,7 @@
 # ADR 0002: A flat structure, with services only for risky logic
 
-- Status: proposed
-- Date: 2026-11-03
+- Status: accepted
+- Date: 2026-11-04
 
 ## Context
 
@@ -28,8 +28,7 @@ request -> routes -> middlewares -> controller -> service -> model -> database
 - **Tenant data access** (`helpers/tenantScope.js` and `helpers/ownership.js`) is the only
   door to the models for tenant data.
 
-Stock services may call billing services, never the reverse. This is kept by convention and
-by one static test.
+Stock services may call billing services, never the reverse. In M1 there are no billing services, so this is kept by convention. A static test that enforces the direction is added together with the first billing service (E8).
 
 Split into per-domain folders (`controllers/stock/`, `controllers/billing/`) only when one
 folder holds more than about 12 to 15 files, imports become circular, or a new standalone
@@ -53,5 +52,5 @@ domain appears.
   service.
 - Splitting into per-domain folders later is a mechanical move, and the tests will catch
   broken imports.
-- The one-way dependency between stock and billing is not enforced by the folder layout, so
-  the static test must stay in place.
+- The one-way dependency between stock and billing is not enforced by the folder layout. Until
+  the static test arrives with the first billing service (E8), it relies on convention.

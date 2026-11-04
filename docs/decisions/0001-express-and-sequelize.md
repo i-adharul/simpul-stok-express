@@ -1,7 +1,7 @@
 # ADR 0001: Express and Sequelize as the stack
 
-- Status: proposed
-- Date: 2026-11-03
+- Status: accepted
+- Date: 2026-11-04
 
 ## Context
 
@@ -52,3 +52,5 @@ The full list, with the reason for each choice, is in `docs/05_Technical_Design.
   access helper and proved by tests (a separate decision).
 - Check the official documentation for Express 5 and Sequelize 6 before using an API from
   memory. Many examples online target Express 4.
+- Sequelize 6 receives few releases. Use the latest 6.37.x, check the project's security
+  advisories before each milestone, and run `npm audit` (E14-05).

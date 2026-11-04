@@ -6,8 +6,8 @@ The numbers below are reserved from the start so that other documents can refer 
 
 | No   | Title                                                                                    | Status   | Story |
 | ---- | ---------------------------------------------------------------------------------------- | -------- | ----- |
-| 0001 | Express and Sequelize as the stack                                                       | proposed | E0-01 |
-| 0002 | A flat structure, with services only for risky logic                                     | proposed | E0-01 |
+| 0001 | Express and Sequelize as the stack                                                       | accepted | E0-01 |
+| 0002 | A flat structure, with services only for risky logic                                     | accepted | E0-01 |
 | 0003 | Database conventions (IDs, names, times, deletes, rules in SQL)                          | planned  | E0-04 |
 | 0004 | Sequelize 6 and `sequelize-cli` for migrations and seeders                               | planned  | E0-04 |
 | 0005 | Immutable stock movements enforced by a database trigger                                 | planned  | E0-05 |

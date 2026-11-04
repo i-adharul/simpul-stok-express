@@ -77,7 +77,7 @@ request -> routes -> middlewares -> controller -> service -> model -> database
 3. **Service:** the risky business logic (login and session, stock changes, transfers, idempotency). It knows nothing about `req` and `res`.
 4. **Tenant data access** (`helpers/tenantScope.js`): the only door to the models for tenant data. It always adds the `organizationId` from `req.ctx`.
 
-**Dependency direction.** Stock services may call billing services (for example to check a plan limit), never the other way round. This is kept by convention and one static test.
+**Dependency direction.** Stock services may call billing services (for example to check a plan limit), never the other way round. In M1 there are no billing services, so this is kept by convention. A static test that enforces the direction is added together with the first billing service (E8).
 
 **When the flat structure is split.** When one folder holds more than about 12 to 15 files, imports become circular, or a new standalone domain appears, move to per-domain subfolders (`controllers/stock/`, `controllers/billing/`). That is a mechanical refactor and the tests will catch broken imports.
 
