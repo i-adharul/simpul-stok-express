@@ -17,6 +17,7 @@ const insertOrganization = (overrides = {}) =>
 
 describe("Organizations table", () => {
   beforeEach(async () => {
+    await getSequelize().query('DELETE FROM "Users"');
     await getSequelize().query('DELETE FROM "Organizations"');
   });
 
