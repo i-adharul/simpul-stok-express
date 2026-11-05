@@ -117,3 +117,82 @@ describe("BL01: a user deactivated mid-session is rejected", () => {
     expect((await me(token)).status).toBe(200);
   });
 });
+
+describe("BL01: an expired token is rejected", () => {
+  it("a login token lasts exactly 8 hours", async () => {
+    const account = await createAccount();
+
+    const { iat, exp } = jwt.decode(await login(account));
+
+    expect(exp - iat).toBe(8 * 60 * 60);
+  });
+
+  it("a token that expires while the user is working is refused once the time has passed", async () => {
+    const account = await createAccount();
+    const token = signToken(account.id, "1s");
+    expect((await me(token)).status).toBe(200);
+
+    await sleep(2100);
+
+    expectSessionEnded(await me(token));
+  });
+
+  it("a token whose expiry is already in the past is refused", async () => {
+    const account = await createAccount();
+
+    expectSessionEnded(await me(signToken(account.id, "-1s")));
+    expectSessionEnded(await me(signToken(account.id, -3600)));
+  });
+
+  it("an expired token is refused on every protected endpoint", async () => {
+    const account = await createAccount();
+    const expired = signToken(account.id, "-1s");
+
+    expectSessionEnded(await me(expired));
+    expectSessionEnded(
+      await changePassword(expired, { currentPassword: account.password, newPassword: "Kopi-Susu-2027" }),
+    );
+  });
+
+  it("the expiry cannot be extended by editing the token", async () => {
+    const account = await createAccount();
+    const [header, , signature] = signToken(account.id, "-1s").split(".");
+    const payload = Buffer.from(
+      JSON.stringify({ sub: account.id, iat: 1, exp: Math.floor(Date.now() / 1000) + 3600 }),
+    ).toString("base64url");
+
+    expectSessionEnded(await me(`${header}.${payload}.${signature}`));
+  });
+
+  it("using the token does not extend it: no new token is issued and the old expiry stands", async () => {
+    const account = await createAccount();
+    const token = await login(account);
+    const before = jwt.decode(token);
+
+    const res = await me(token);
+
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain("token");
+    expect(res.headers).not.toHaveProperty("authorization");
+    expect(res.headers).not.toHaveProperty("set-cookie");
+    expect(jwt.decode(token).exp).toBe(before.exp);
+  });
+
+  it("an expired token can still call logout (always 204), but it opens nothing else", async () => {
+    const account = await createAccount();
+    const expired = signToken(account.id, "-1s");
+
+    const res = await request(app).post("/api/auth/logout").set("Authorization", `Bearer ${expired}`);
+
+    expect(res.status).toBe(204);
+    expectSessionEnded(await me(expired));
+  });
+
+  it("a token signed with the right secret but for 8 hours ago plus a second is refused", async () => {
+    const account = await createAccount();
+    const issued = Math.floor(Date.now() / 1000) - 8 * 60 * 60 - 1;
+    const token = jwt.sign({ iat: issued }, env.JWT_SECRET, { subject: account.id, expiresIn: "8h" });
+
+    expectSessionEnded(await me(token));
+  });
+});
