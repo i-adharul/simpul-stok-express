@@ -1,0 +1,32 @@
+### Stock (E4-02). Local server: cd server && npm run dev
+# Needs the seed: cd server && npx sequelize db:seed:all
+# Log in first (http/auth.http); the token of the Owner goes into @token below.
+@token = paste-the-token-here
+@baseUrl = http://localhost:3000
+# IDs from the list answers (GET /api/warehouses and GET /api/products):
+@warehouseId = paste-a-warehouse-id-here
+@productId = paste-a-product-id-here
+# A new UUID each time you want a new receipt. Sending the SAME one again is a replay.
+@key = 7b0d6a54-1f0e-4a39-9a1c-5d2f8c3e4b10
+
+### Receive stock (Owner, or Warehouse Admin of an assigned warehouse)
+# Expect 201 { id, warehouseId, productId, quantity, createdAt } (the movement, not the balance).
+# Send it again with the same Idempotency-Key: the same 201 body plus the header Idempotency-Replayed: true,
+# and no second movement.
+# 400 VALIDATION_ERROR: no or malformed Idempotency-Key, quantity outside 1..1000000, note over 255 characters, unknown field.
+# 403 FORBIDDEN: a Viewer, or a warehouse that is unassigned, archived, foreign or missing (one body).
+# 404 NOT_FOUND: a product that is foreign or missing. 409 CONFLICT: an archived product, or the stock would pass 2147483647.
+POST {{baseUrl}}/api/stock/receive
+Authorization: Bearer {{token}}
+Idempotency-Key: {{key}}
+Content-Type: application/json
+
+{ "warehouseId": "{{warehouseId}}", "productId": "{{productId}}", "quantity": 25, "note": "PO-2026-001" }
+
+### Missing Idempotency-Key
+# Expect 400 VALIDATION_ERROR with details [{ "source": "header", "path": "Idempotency-Key", "message": "Wajib diisi." }]
+POST {{baseUrl}}/api/stock/receive
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "warehouseId": "{{warehouseId}}", "productId": "{{productId}}", "quantity": 1 }

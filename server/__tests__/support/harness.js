@@ -25,7 +25,8 @@ function send(app, entry, { id, authorization, body, query, headers = {}, key } 
 }
 
 // A valid body for the entry, so a 400 can never hide the answer the check is looking for.
-const validBody = (entry, world) => (entry.body ? entry.body(world) : undefined);
+// `entry.body` may be async: a stock write needs a warehouse and a product that exist first.
+const validBody = async (entry, world) => (entry.body ? entry.body(world) : undefined);
 
 const fail = (entry, message) => `${labelOf(entry)}: ${message}`;
 const expectStatus = (entry, what, res, status) =>
@@ -44,7 +45,7 @@ async function checkNoToken(app, entry, world) {
     ["no token", undefined],
     ["a garbage token", "Bearer not.a.token"],
   ]) {
-    const res = await send(app, entry, { id, authorization, body: validBody(entry, world) });
+    const res = await send(app, entry, { id, authorization, body: await validBody(entry, world) });
     failures.push(...expectStatus(entry, what, res, 401));
   }
   return failures;
@@ -56,7 +57,7 @@ async function checkPlatformAdmin(app, entry, world) {
   const res = await send(app, entry, {
     id,
     authorization: world.platformAdmin.authorization,
-    body: validBody(entry, world),
+    body: await validBody(entry, world),
   });
   return expectStatus(entry, "Platform admin", res, 403);
 }
@@ -75,7 +76,7 @@ async function checkRoleWithoutRight(app, entry, world) {
       const res = await send(app, entry, {
         id,
         authorization: world.users.A[role].authorization,
-        body: validBody(entry, world),
+        body: await validBody(entry, world),
       });
       failures.push(...expectStatus(entry, `${role} (not allowed) with ${id ?? "no id"}`, res, 403));
     }
@@ -102,7 +103,7 @@ async function checkForeignItem(app, entry, world) {
   const foreign = await entry.createRow(world, "B");
   const before = await entry.readRow(foreign.id);
 
-  const ask = (id) => send(app, entry, { id, authorization: user.authorization, body: validBody(entry, world) });
+  const ask = async (id) => send(app, entry, { id, authorization: user.authorization, body: await validBody(entry, world) });
   const [foreignRes, missingRes, notUuidRes] = [await ask(foreign.id), await ask(RANDOM_UUID), await ask("not-a-uuid")];
 
   failures.push(...expectStatus(entry, "B's id", foreignRes, 404));
@@ -169,7 +170,7 @@ async function checkOrganizationIdInput(app, entry, world) {
     id: own?.id,
     authorization: user.authorization,
     query: { organizationId: orgB },
-    body: { ...(validBody(entry, world) ?? {}), organizationId: orgB },
+    body: { ...((await validBody(entry, world)) ?? {}), organizationId: orgB },
   });
 
   if (res.status >= 500) failures.push(fail(entry, `organizationId in the query and body caused ${res.status}`));
@@ -200,7 +201,7 @@ async function checkForeignBodies(app, entry, world) {
       entry.countRows ? [await entry.countRows(world.organizations.A), await entry.countRows(world.organizations.B)] : [];
     const before = await counts();
 
-    const ask = (value) => send(app, entry, { id, authorization: user.authorization, body: body(world, value) });
+    const ask = async (value) => send(app, entry, { id, authorization: user.authorization, body: await body(world, value) });
     const withForeign = await ask(foreign.id);
     const withRandom = await ask(RANDOM_UUID);
 
@@ -229,7 +230,7 @@ async function checkIdempotencyKey(app, entry, world) {
   ]) {
     const id = entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined;
     const before = await entry.countRows(world.organizations.A);
-    const res = await send(app, entry, { id, authorization: user.authorization, body: validBody(entry, world), key });
+    const res = await send(app, entry, { id, authorization: user.authorization, body: await validBody(entry, world), key });
 
     failures.push(...expectStatus(entry, what, res, 400));
     if (res.body?.code !== "VALIDATION_ERROR") failures.push(fail(entry, `${what}: expected code VALIDATION_ERROR but got ${res.body?.code}`));
@@ -246,7 +247,7 @@ async function checkIdempotentReplay(app, entry, world) {
   const id = entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined;
   const key = crypto.randomUUID();
   const before = await entry.countRows(world.organizations.A);
-  const ask = () => send(app, entry, { id, authorization: user.authorization, body: validBody(entry, world), key });
+  const ask = async () => send(app, entry, { id, authorization: user.authorization, body: await validBody(entry, world), key });
 
   const first = await ask();
   const second = await ask();
