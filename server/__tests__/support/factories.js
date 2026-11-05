@@ -54,7 +54,64 @@ const createSubscription = (organizationId, planId) =>
     { organizationId, planId },
   );
 
+const createProduct = (organizationId, sku = "SKU-1", unit = "pcs") =>
+  insertReturningId(
+    `INSERT INTO "Products" ("organizationId", "sku", "name", "unit")
+     VALUES (:organizationId, :sku, :sku, :unit)`,
+    { organizationId, sku, unit },
+  );
+
+// The world of the cross-tenant harness: two organizations (A is the caller, B is the "other
+// tenant"), one user per role in each, ready-to-use tokens, and builders that make rows for either
+// organization. Rows are raw SQL like the other factories, so the harness does not depend on the
+// code it checks. Call it once per test, after the tables were cleared.
+const ROLES_IN_ORGANIZATION = ["OWNER", "WAREHOUSE_ADMIN", "VIEWER"];
+
+async function createWorld() {
+  // Required here, not at the top: accounts.js itself requires this file.
+  const { createAccount } = require("./accounts");
+  const { signToken } = require("../../helpers/jwt");
+
+  const organizations = {
+    A: await createOrganization("tokoa"),
+    B: await createOrganization("tokob"),
+  };
+
+  const withToken = (user) => ({ ...user, token: signToken(user.id), authorization: `Bearer ${signToken(user.id)}` });
+
+  const users = { A: {}, B: {} };
+  for (const key of ["A", "B"]) {
+    for (const role of ROLES_IN_ORGANIZATION) {
+      users[key][role] = withToken(
+        await createAccount({
+          email: `${role.toLowerCase()}-${key.toLowerCase()}@example.com`,
+          name: `${role} ${key}`,
+          role,
+          organizationId: organizations[key],
+        }),
+      );
+    }
+  }
+  const platformAdmin = withToken(
+    await createAccount({ email: "admin@example.com", name: "Admin", role: "PLATFORM_ADMIN" }),
+  );
+
+  let counter = 0;
+  const next = () => String(++counter).padStart(3, "0");
+  return {
+    organizations,
+    users,
+    platformAdmin,
+    // organization is "A" or "B"
+    createWarehouse: (organization, code = `GD-${next()}`) => createWarehouse(organizations[organization], code),
+    createProduct: (organization, sku = `SKU-${next()}`) => createProduct(organizations[organization], sku),
+  };
+}
+
 module.exports = {
+  ROLES_IN_ORGANIZATION,
+  createWorld,
+  createProduct,
   insertReturningId,
   createOrganization,
   createUser,
