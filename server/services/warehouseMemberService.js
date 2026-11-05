@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { notFound, validationError } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
+const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
 
 // Warehouse assignment (BL10): who of the organization may work in a warehouse. Only a Warehouse
@@ -38,9 +39,9 @@ async function getMembers(ctx, warehouseId) {
 // findOwned) and then an active Warehouse Admin or Viewer (400, one generic message that does not
 // say which user or why). The existence check comes first, so the 400 can never reveal a user of
 // another organization.
-async function assertAssignable(ctx, userIds) {
+async function assertAssignable(ctx, userIds, options = {}) {
   if (userIds.length === 0) return;
-  const users = await tenant(ctx).User.findAll({ where: { id: { [Op.in]: userIds } }, attributes: ["id", "role", "isActive"] });
+  const users = await tenant(ctx).User.findAll({ where: { id: { [Op.in]: userIds } }, attributes: ["id", "role", "isActive"], ...options });
   if (users.length !== userIds.length) throw notFound();
   if (users.some((user) => !user.isActive || !ASSIGNABLE_ROLES.includes(user.role))) {
     throw validationError([{ source: "body", path: "userIds", message: "Ada pengguna yang tidak dapat ditugaskan." }]);
@@ -62,11 +63,19 @@ async function applyAssignment(ctx, warehouseId, userIds, options = {}) {
   }
 }
 
-async function replaceMembers(ctx, warehouseId, userIds) {
-  const warehouse = await findActiveWarehouse(ctx, warehouseId);
-  await assertAssignable(ctx, userIds);
-  await applyAssignment(ctx, warehouse.id, userIds);
-  return { candidates: await listCandidates(ctx, warehouse.id) };
+// One transaction for the whole replacement: the delete of the old rows and the insert of the new
+// ones commit together or not at all, so a failure halfway never leaves a half-changed
+// assignment. The warehouse row is locked first (SELECT ... FOR UPDATE), so two simultaneous
+// replacements of the same warehouse run one after the other and cannot mix their lists or
+// collide on the unique key (userId, warehouseId).
+function replaceMembers(ctx, warehouseId, userIds) {
+  return inTransaction(async (transaction) => {
+    const options = { transaction };
+    const warehouse = await findActiveWarehouse(ctx, warehouseId, { ...options, lock: transaction.LOCK.UPDATE });
+    await assertAssignable(ctx, userIds, options);
+    await applyAssignment(ctx, warehouse.id, userIds, options);
+    return { candidates: await listCandidates(ctx, warehouse.id, options) };
+  });
 }
 
 module.exports = {
