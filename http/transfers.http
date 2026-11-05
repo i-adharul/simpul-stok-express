@@ -86,3 +86,13 @@ Idempotency-Key: 3e4d5c6b-7f80-4192-8cbd-2e3f4a5b6c77
 Content-Type: application/json
 
 { "fromWarehouseId": "{{fromWarehouseId}}", "toWarehouseId": "33333333-3333-4333-8333-333333333333", "items": [{ "productId": "{{productId}}", "quantity": 1 }] }
+
+### One transfer (every tenant role; S12)
+# Visible when the caller reaches the source OR the destination warehouse (an Owner reaches every active one).
+# Expect 200 { id, code, note, createdAt, createdBy { id, name, role } | null, fromWarehouse { id, code, name, address },
+#   toWarehouse { ... }, items: [{ productId, sku, name, unit, quantity, outMovementId, inMovementId }] } ordered by product ID.
+# A movement ID is null when its warehouse is not one the caller reaches. No balances, no email.
+# 404 NOT_FOUND (one body): a malformed id, a missing one, another organization's, or one outside the caller's warehouses.
+@transferId = paste-the-id-of-a-transfer-here
+GET {{baseUrl}}/api/stock/transfers/{{transferId}}
+Authorization: Bearer {{token}}
