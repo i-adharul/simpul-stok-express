@@ -67,6 +67,40 @@ describe("requestLogger", () => {
     expect(lines.join("")).not.toContain("SECRET-TOKEN-123");
   });
 
+  it("keeps the mount prefix of a route inside nested routers, also when the handler fails", async () => {
+    const lines = [];
+    const logger = createLogger({ write: (line) => lines.push(line) });
+    const server = express();
+    server.use(createRequestLogger(logger));
+    const inner = express.Router();
+    inner.get("/things/:id", (req, res) => res.json({}));
+    inner.get("/broken", () => {
+      throw new Error("boom");
+    });
+    const outer = express.Router();
+    outer.use(inner);
+    server.use("/api", outer);
+    server.use((err, req, res, next) => res.status(500).json({}));
+
+    await request(server).get("/api/things/42");
+    await request(server).get("/api/broken");
+
+    expect(lines.map((line) => JSON.parse(line).path)).toEqual(["/api/things/:id", "/api/broken"]);
+  });
+
+  it("logs the full path of a real route, with /api", async () => {
+    const lines = [];
+    const logger = createLogger({ write: (line) => lines.push(line) });
+    const { createRequestLogger: build } = require("../middlewares/requestLogger");
+    const server = express();
+    server.use(build(logger));
+    server.use("/api", require("../routes"));
+
+    await request(server).get("/api/health");
+
+    expect(JSON.parse(lines[0]).path).toBe("/api/health");
+  });
+
   it("does not log the query string of an unmatched path", async () => {
     const { server, entries, lines } = buildApp();
     await request(server).get("/nowhere?token=SECRET-QUERY");
