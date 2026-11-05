@@ -33,7 +33,7 @@ curl -X POST http://localhost:3000/api/warehouses \
 | `GET /api/products` | every tenant role | Paged list. Query `page` (default 1), `pageSize` (default 20, at most 100), `includeArchived` (`true` or `false`, Owner only). Ordered by `sku`, then `id`. There is no search parameter. |
 | `GET /api/products/:id` | every tenant role | One product. `404` for a malformed, missing or foreign ID, and for an archived product unless the caller is the Owner. |
 | `POST /api/products` | Owner | Body `sku` (all whitespace removed, stored uppercase, 1 to 50, unique per organization), `name` (1 to 100), `unit` (`bks`, `ktk`, `pcs`, `btl`, `jrg`, `pak`), optional `minStock` (whole number 0 to 1,000,000,000, default 0). `409` "SKU sudah dipakai." when the SKU exists. |
-| `PATCH /api/products/:id` | Owner | Body with at least one of `sku`, `name`, `unit`, `minStock` (same rules as `POST`). `archived` arrives with the archive story. |
+| `PATCH /api/products/:id` | Owner | Body with at least one of `sku`, `name`, `unit`, `minStock` (same rules as `POST`) and `archived` (`true` archives, `false` restores). A product may be archived while it still has stock. An archived product is found only when restoring; otherwise `404`. |
 
 Example:
 

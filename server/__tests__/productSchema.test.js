@@ -47,7 +47,7 @@ describe("createProductSchema", () => {
   });
 
   it("rejects unknown fields, organizationId included", () => {
-    const { error } = create({ sku: "A", name: "B", unit: "pcs", organizationId: "x", archived: true });
+    const { error } = create({ sku: "A", name: "B", unit: "pcs", organizationId: "x", archived: true }); // archived only on update
 
     expect(paths(error)).toEqual(["organizationId", "archived"]);
   });
@@ -62,9 +62,14 @@ describe("updateProductSchema", () => {
     expect(update({ name: "N" }).valid.body).toEqual({ name: "N" });
   });
 
+  it("accepts archived as a boolean only", () => {
+    expect(update({ archived: false }).valid.body).toEqual({ archived: false });
+    expect(paths(update({ archived: "true" }).error)).toEqual(["archived"]);
+  });
+
   it("rejects an empty body, an unknown field and bad values", () => {
     expect(update({}).error.status).toBe(400);
-    expect(paths(update({ archived: true }).error)).toEqual(["archived"]);
+    expect(paths(update({ organizationId: "x" }).error)).toEqual(["organizationId"]);
     expect(paths(update({ unit: "kg" }).error)).toEqual(["unit"]);
     expect(paths(update({ minStock: -5 }).error)).toEqual(["minStock"]);
   });

@@ -43,9 +43,25 @@ Content-Type: application/json
 { "sku": "X1", "name": "Produk X", "unit": "kg", "organizationId": "00000000-0000-4000-8000-000000000000" }
 
 ### Update (Owner only, at least one of sku, name, unit, minStock)
-# Expect 200 with the product. 404 for an archived product until it is restored (E3-06).
+# Expect 200 with the product. 404 for an archived product unless the body restores it (archived: false).
 PATCH {{baseUrl}}/api/products/{{productId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "name": "Teh Botol 450 ml (baru)", "minStock": 0 }
+
+### Archive (Owner only). Allowed even while the product still has stock.
+# Expect 200 with archivedAt set.
+PATCH {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "archived": true }
+
+### Restore (an archived product is found only for this)
+# Expect 200 with archivedAt null.
+PATCH {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "archived": false }
