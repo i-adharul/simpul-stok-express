@@ -14,6 +14,8 @@ const {
   checkCursor,
   checkOrganizationIdInput,
   checkForeignBodies,
+  checkIdempotencyKey,
+  checkIdempotentReplay,
 } = require("./support/harness");
 
 jest.setTimeout(60000);
@@ -143,5 +145,53 @@ describe("part 2: B's data from A's session", () => {
     expect(await checkForeignItem(app, entries.list, world)).toEqual([]);
     expect(await checkCursor(app, entries.read, world)).toEqual([]);
     expect(await checkForeignBodies(app, entries.read, world)).toEqual([]);
+  });
+});
+
+describe("idempotency checks (entries with idempotent: true)", () => {
+  it("idempotencyKey fails when a missing key is accepted and a row is created", async () => {
+    const failures = await attack({ noKeyCheck: true }, "create", checkIdempotencyKey);
+
+    expect(failures.join("\n")).toMatch(/POST \/things: a missing key: expected 400 but got 201/);
+    expect(failures.join("\n")).toMatch(/a missing key: a row was created/);
+  });
+
+  it("idempotencyKey fails when a malformed key is accepted", async () => {
+    const failures = await attack({ malformedKeyAccepted: true }, "create", checkIdempotencyKey);
+
+    expect(failures.join("\n")).toMatch(/a malformed key: expected 400 but got 201/);
+    expect(failures.join("\n")).not.toMatch(/a missing key/);
+  });
+
+  it("idempotentReplay fails when the replay header is missing", async () => {
+    const failures = await attack({ noReplayHeader: true }, "create", checkIdempotentReplay);
+
+    expect(failures).toEqual([expect.stringMatching(/replay: Idempotency-Replayed: true is missing/)]);
+  });
+
+  it("idempotentReplay fails when the second request does the work again", async () => {
+    const failures = await attack({ replayCreatesAgain: true }, "create", checkIdempotentReplay);
+
+    expect(failures.join("\n")).toMatch(/replay: the body is not identical/);
+    expect(failures.join("\n")).toMatch(/replay: Idempotency-Replayed: true is missing/);
+    expect(failures.join("\n")).toMatch(/expected 1 new row\(s\) but 2 were created/);
+  });
+
+  it("a correct idempotent route passes both checks, and a non-idempotent entry is skipped", async () => {
+    const { app, store } = buildFakeApp();
+    const entries = fakeEntries(store);
+
+    expect(await checkIdempotencyKey(app, entries.create, world)).toEqual([]);
+    expect(await checkIdempotentReplay(app, entries.create, world)).toEqual([]);
+    expect(await checkIdempotencyKey(app, entries.list, world)).toEqual([]);
+    expect(await checkIdempotentReplay(app, entries.read, world)).toEqual([]);
+  });
+
+  it("the other checks still send a valid key, so a missing key cannot hide their answer", async () => {
+    const { app, store } = buildFakeApp({ parentLeak: true });
+
+    const failures = await checkForeignBodies(app, fakeEntries(store).create, world);
+
+    expect(failures.join("\n")).toMatch(/B's id was not refused \(status 201\)/);
   });
 });

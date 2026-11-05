@@ -87,9 +87,32 @@ function buildFakeApp(flaws = {}) {
     res.json({ data: row });
   });
 
+  // Idempotency (rule 9): a valid UUID key is required, and a repeated key gets the first answer
+  // again with Idempotency-Replayed: true, without a second effect. Flaws: "noKeyCheck" accepts a
+  // missing key, "malformedKeyAccepted" accepts any text, "noReplayHeader" forgets the header,
+  // "replayCreatesAgain" does the work a second time.
+  const seen = new Map();
+  function idempotent(req, res, next) {
+    const key = req.get("Idempotency-Key");
+    const valid = flaws.malformedKeyAccepted ? Boolean(key) : UUID.test(key ?? "");
+    if (!valid && !flaws.noKeyCheck) throw validationError({ header: "Idempotency-Key" });
+    const slot = `${req.ctx.organizationId}:${key}`;
+    if (key && seen.has(slot) && !flaws.replayCreatesAgain) {
+      const first = seen.get(slot);
+      if (!flaws.noReplayHeader) res.set("Idempotency-Replayed", "true");
+      return res.status(first.status).type("json").send(first.text);
+    }
+    const send = res.send.bind(res);
+    res.send = (text) => {
+      if (key) seen.set(slot, { status: res.statusCode, text });
+      return send(text);
+    };
+    return next();
+  }
+
   // Create. `parentId` is a foreign key to another thing: it must be the caller's own, looked up,
   // so a foreign id is a 404 like a random one. Flaw "parentLeak" accepts any existing row.
-  router.post("/things", authenticate, guard("warehouse.manage"), express.json(), (req, res) => {
+  router.post("/things", authenticate, guard("warehouse.manage"), idempotent, express.json(), (req, res) => {
     const body = readBody(req.body, ["name", "parentId"]);
     if (body.parentId !== undefined) {
       const parent = UUID.test(body.parentId) && rows.find((r) => r.id === body.parentId);
@@ -137,6 +160,7 @@ function fakeEntries(store) {
       createRow,
       readRow,
       body: () => ({ name: "Baru" }),
+      idempotent: true,
       countRows: async (organizationId) => store.count(organizationId),
       foreignBodies: [{ key: "parentId", body: (world, id) => ({ name: "Anak", parentId: id }) }],
     },

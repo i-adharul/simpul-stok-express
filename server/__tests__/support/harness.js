@@ -3,6 +3,7 @@
 // the endpoint from organization A's session against organization B's data, and RETURNS a list of
 // failure messages (empty = the endpoint held). Returning messages, instead of calling expect,
 // lets the self-test (harness.selftest.test.js) prove that a flawed route makes the check fail.
+const crypto = require("crypto");
 const request = require("supertest");
 const { allowedRoles, labelOf, TENANT_ROLES } = require("./registry");
 
@@ -11,9 +12,12 @@ const RANDOM_UUID = "33333333-3333-4333-8333-333333333333";
 const urlFor = (entry, id = RANDOM_UUID) => entry.path.replace(":id", id);
 
 // Sends one request to the entry's endpoint. `id` fills ":id"; `body` is only sent on writes.
-function send(app, entry, { id, authorization, body, query, headers = {} } = {}) {
+// An idempotent entry gets a fresh valid Idempotency-Key unless `key` says otherwise (a string =
+// that key, null = none), so the other checks are not hidden behind a missing-key 400.
+function send(app, entry, { id, authorization, body, query, headers = {}, key } = {}) {
   let req = request(app)[entry.method](urlFor(entry, id));
   if (authorization) req = req.set("Authorization", authorization);
+  if (entry.idempotent && key !== null) req = req.set("Idempotency-Key", key ?? crypto.randomUUID());
   for (const [name, value] of Object.entries(headers)) req = req.set(name, value);
   if (query) req = req.query(query);
   if (body !== undefined && entry.method !== "get") req = req.send(body);
@@ -209,6 +213,54 @@ async function checkForeignBodies(app, entry, world) {
   return failures;
 }
 
+// ---- Idempotency (entries with idempotent: true) ----------------------------------------------
+
+// 9. A missing or malformed Idempotency-Key: 400 VALIDATION_ERROR, and no row is created.
+async function checkIdempotencyKey(app, entry, world) {
+  if (!entry.idempotent) return [];
+  const user = attacker(entry, world);
+  const failures = [];
+  for (const [what, key] of [
+    ["a missing key", null],
+    ["a malformed key", "not-a-uuid"],
+    ["an empty key", ""],
+  ]) {
+    const id = entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined;
+    const before = await entry.countRows(world.organizations.A);
+    const res = await send(app, entry, { id, authorization: user.authorization, body: validBody(entry, world), key });
+
+    failures.push(...expectStatus(entry, what, res, 400));
+    if (res.body?.code !== "VALIDATION_ERROR") failures.push(fail(entry, `${what}: expected code VALIDATION_ERROR but got ${res.body?.code}`));
+    if ((await entry.countRows(world.organizations.A)) !== before) failures.push(fail(entry, `${what}: a row was created`));
+  }
+  return failures;
+}
+
+// 10. The same valid request twice with one key: same 2xx status and identical body; only the
+// second carries Idempotency-Replayed: true; exactly one row is created.
+async function checkIdempotentReplay(app, entry, world) {
+  if (!entry.idempotent) return [];
+  const user = attacker(entry, world);
+  const id = entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined;
+  const key = crypto.randomUUID();
+  const before = await entry.countRows(world.organizations.A);
+  const ask = () => send(app, entry, { id, authorization: user.authorization, body: validBody(entry, world), key });
+
+  const first = await ask();
+  const second = await ask();
+
+  const failures = [];
+  if (first.status < 200 || first.status >= 300) failures.push(fail(entry, `first request: expected 2xx but got ${first.status}`));
+  if (second.status !== first.status) failures.push(fail(entry, `replay: expected status ${first.status} but got ${second.status}`));
+  if (second.text !== first.text) failures.push(fail(entry, "replay: the body is not identical to the first answer"));
+  if (first.headers["idempotency-replayed"]) failures.push(fail(entry, "the first request carries Idempotency-Replayed"));
+  if (second.headers["idempotency-replayed"] !== "true") failures.push(fail(entry, "replay: Idempotency-Replayed: true is missing"));
+  const created = (await entry.countRows(world.organizations.A)) - before;
+  const expected = entry.kind === "create" ? 1 : 0;
+  if (created !== expected) failures.push(fail(entry, `replay: expected ${expected} new row(s) but ${created} were created`));
+  return failures;
+}
+
 const CHECKS = {
   noToken: checkNoToken,
   platformAdmin: checkPlatformAdmin,
@@ -218,6 +270,8 @@ const CHECKS = {
   cursor: checkCursor,
   organizationIdInput: checkOrganizationIdInput,
   foreignBodies: checkForeignBodies,
+  idempotencyKey: checkIdempotencyKey,
+  idempotentReplay: checkIdempotentReplay,
 };
 
 // Runs every check that applies to the entry and returns all failure messages.
@@ -245,4 +299,6 @@ module.exports = {
   checkCursor,
   checkOrganizationIdInput,
   checkForeignBodies,
+  checkIdempotencyKey,
+  checkIdempotentReplay,
 };
