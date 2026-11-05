@@ -11,12 +11,24 @@ describe("models/index.js", () => {
     expect(db.sequelize.config.database).not.toBe("simpul_dev");
   });
 
-  it("loads the four models", () => {
+  it("loads every model", () => {
     expect(
       Object.keys(db)
         .filter((key) => /^[A-Z]/.test(key) && key !== "Sequelize")
         .sort(),
-    ).toEqual(["Organization", "Plan", "Subscription", "User"]);
+    ).toEqual([
+      "IdempotencyKey",
+      "Organization",
+      "Plan",
+      "Product",
+      "StockLevel",
+      "StockMovement",
+      "StockTransfer",
+      "Subscription",
+      "User",
+      "UserWarehouse",
+      "Warehouse",
+    ]);
   });
 
   it("links an organization to its users and to exactly one subscription", () => {
@@ -33,5 +45,62 @@ describe("models/index.js", () => {
     );
     expect(db.Subscription.associations.Plan.associationType).toBe("BelongsTo");
     expect(db.Plan.associations.Subscriptions.associationType).toBe("HasMany");
+  });
+
+  it("links a warehouse to its organization and its user assignments", () => {
+    expect(db.Organization.associations.Warehouses.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.Warehouse.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Warehouse.associations.UserWarehouses.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.UserWarehouse.associations.User.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.UserWarehouse.associations.Warehouse.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links a product to its organization", () => {
+    expect(db.Product.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Organization.associations.Products.associationType).toBe(
+      "HasMany",
+    );
+  });
+
+  it("links a stock level to its warehouse and product", () => {
+    expect(db.StockLevel.associations.Warehouse.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.StockLevel.associations.Product.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links a transfer to its two warehouses and its movements", () => {
+    expect(db.StockTransfer.associations.fromWarehouse.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.StockTransfer.associations.toWarehouse.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.StockTransfer.associations.StockMovements.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.StockMovement.associations.StockTransfer.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links an idempotency key to its organization", () => {
+    expect(db.IdempotencyKey.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
   });
 });
