@@ -1,5 +1,6 @@
 const express = require("express");
 const warehouseController = require("../controllers/warehouseController");
+const warehouseMemberController = require("../controllers/warehouseMemberController");
 const authentication = require("../middlewares/authentication");
 const { requireCan } = require("../middlewares/authorization");
 const noStore = require("../middlewares/noStore");
@@ -44,6 +45,15 @@ router.patch(
   subscriptionGuard,
   validate({ body: updateWarehouseSchema }),
   warehouseController.update,
+);
+
+// Assignment (BL10) is the Owner's. The role is checked before the ID is looked at, so another
+// role gets 403 whatever the warehouse is (rule 2).
+router.get(
+  "/warehouses/:id/members",
+  authentication,
+  requireCan("member.manage"),
+  warehouseMemberController.list,
 );
 
 module.exports = router;
