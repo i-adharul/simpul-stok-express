@@ -1,42 +1,14 @@
 const crypto = require("crypto");
-const express = require("express");
 const request = require("supertest");
 const db = require("../models");
-const authentication = require("../middlewares/authentication");
-const { requireCan } = require("../middlewares/authorization");
-const idempotencyKey = require("../middlewares/idempotencyKey");
-const { errorHandler } = require("../middlewares/errorHandler");
-const { tenant } = require("../helpers/tenantScope");
-const idempotencyService = require("../services/idempotencyService");
 const { getSequelize } = require("./support/db");
+const { buildIdempotentTestApp } = require("./support/idempotentTestApp");
 const { clearTables } = require("./support/clearTables");
 const { createWorld } = require("./support/factories");
 
 jest.setTimeout(60000);
 
-// A test-only endpoint built the way a stock endpoint is built (E4-02): authentication, the role
-// check, the key header, then the service. Its effect is one Warehouse row.
-const ENDPOINT = "POST /test/warehouses";
-const app = express();
-app.use(express.json());
-app.post("/test/warehouses", authentication, requireCan("warehouse.manage"), idempotencyKey, async (req, res) => {
-  const { ctx } = req;
-  const { replayed, body } = await idempotencyService.run(
-    ctx,
-    { key: req.idempotencyKey, endpoint: ENDPOINT },
-    {
-      work: async (transaction) => (await tenant(ctx).Warehouse.create({ code: req.body.code, name: req.body.code }, { transaction })).id,
-      load: async (id) => {
-        const row = await tenant(ctx).Warehouse.findByPk(id);
-        return row && { id: row.id, code: row.code };
-      },
-      access: () => true,
-    },
-  );
-  if (replayed) res.set("Idempotency-Replayed", "true");
-  res.status(201).json(body);
-});
-app.use(errorHandler);
+const app = buildIdempotentTestApp();
 
 let world;
 beforeEach(async () => {
