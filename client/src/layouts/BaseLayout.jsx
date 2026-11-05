@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useNavigate } from 'react-router'
+import { useAuth } from '../context/authContext'
 import { ROLE_LABELS, visibleNav } from '../constants/navigation'
 
 function Icon({ name, className = '' }) {
@@ -51,10 +52,18 @@ function Sidebar({ user, onNavigate }) {
 }
 
 // Layout route: the sidebar and top bar stay, <Outlet /> is replaced by the current view.
-// `user` is a prop for now; E1-04 replaces it with the value from AuthContext.
-export default function BaseLayout({ user }) {
+// The user comes from AuthContext; ProtectedRoute guarantees there is one.
+export default function BaseLayout() {
+  const { user: authUser, organization, logout } = useAuth()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+  const user = { ...authUser, organizationName: organization?.name ?? '' }
+
+  async function handleLogout() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-base-200">
@@ -79,7 +88,7 @@ export default function BaseLayout({ user }) {
           <span className="hidden text-sm text-base-content/60 lg:inline">{user.organizationName}</span>
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold">{user.name}</span>
-            <button className="btn btn-ghost btn-sm btn-square" title="Keluar dari akun" aria-label="Keluar">
+            <button className="btn btn-ghost btn-sm btn-square" title="Keluar dari akun" aria-label="Keluar" onClick={handleLogout}>
               <Icon name="logout" />
             </button>
           </div>
