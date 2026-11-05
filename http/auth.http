@@ -1,0 +1,28 @@
+### Login (public, no token). Local server: cd server && npm run dev
+# Needs the seed: cd server && npx sequelize db:seed:all
+# Expect 200 {"token","user":{"id","name","email","role"},"redirectTo":"/dashboard"} and Cache-Control: no-store.
+# The email is trimmed and matched in lowercase. The token holds only sub, iat and exp (8 hours).
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{ "email": "owner@example.com", "password": "Simpul-Demo-2026" }
+
+### Platform admin: same call, redirectTo is "/platform"
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{ "email": "platform@example.com", "password": "Simpul-Demo-2026" }
+
+### Wrong password, unknown email, inactive user, password over 72 bytes: one identical answer
+# Expect 401 {"code":"INVALID_CREDENTIALS","message":"Email atau password salah.","details":null}
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{ "email": "owner@example.com", "password": "wrong-password-1" }
+
+### Missing field or unknown field
+# Expect 400 VALIDATION_ERROR with details [{ "source": "body", "path": "password", "message": "Wajib diisi." }]
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{ "email": "owner@example.com" }
