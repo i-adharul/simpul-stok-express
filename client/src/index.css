@@ -1,2 +1,33 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: simpul --default;
+}
+
+/* Colours come from the "Warm Tactile Utility" design tokens. */
+@plugin "daisyui/theme" {
+  name: "simpul";
+  default: true;
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #faf2ee;
+  --color-base-300: #eee7e3;
+  --color-base-content: #1e1b19;
+  --color-primary: #5b4bdb;
+  --color-primary-content: #ffffff;
+  --color-secondary: #645e4d;
+  --color-secondary-content: #ffffff;
+  --color-accent: #422ec2;
+  --color-accent-content: #ffffff;
+  --color-neutral: #33302d;
+  --color-neutral-content: #f7efeb;
+  --color-info: #5746d6;
+  --color-info-content: #ffffff;
+  --color-success: #1f8a5b;
+  --color-success-content: #ffffff;
+  --color-warning: #b7791f;
+  --color-warning-content: #ffffff;
+  --color-error: #ba1a1a;
+  --color-error-content: #ffffff;
+  --radius-box: 0.625rem;
+  --radius-field: 0.5rem;
+}
