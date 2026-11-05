@@ -1,3 +1,4 @@
+const { notFound } = require("../helpers/errors");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
 
@@ -13,8 +14,8 @@ const findKey = (ctx, key, endpoint) => tenant(ctx).IdempotencyKey.findOne({ whe
 //    effect and its key commit together or not at all. The key row comes last because its
 //    resourceId is only known after `work`.
 // 3. If the transaction fails, the key table is checked once more (answerTwinOrThrow).
-// Resolves to { replayed, resourceId }.
-async function run(ctx, { key, endpoint }, { work }) {
+// Resolves to { replayed, resourceId } (this is `execute`; `run` below turns it into the response).
+async function execute(ctx, { key, endpoint }, work) {
   const stored = await findKey(ctx, key, endpoint);
   if (stored) return { replayed: true, resourceId: stored.resourceId };
 
@@ -41,6 +42,27 @@ async function answerTwinOrThrow(ctx, { key, endpoint }, error) {
   const twin = await findKey(ctx, key, endpoint).catch(() => null);
   if (!twin) throw error;
   return { replayed: true, resourceId: twin.resourceId };
+}
+
+// Turns the ID into the response body. The first call and a replay both go through load(), so the
+// two cannot differ in shape. Only a replay is authorized again: the first call was authorized by
+// the handler before run() was called, and a replay is judged against the stored resource itself
+// (its warehouse may be one this caller no longer reaches). A resource the caller may not see, or
+// that is gone, is the same 404 as a missing one (rule 2), never 403.
+async function respond(ctx, { replayed, resourceId }, { load, access }) {
+  const body = await load(resourceId);
+  if (!body) throw notFound();
+  if (replayed && !(await access(ctx, body))) throw notFound();
+  return { replayed, body };
+}
+
+// The door for stock writes. The caller must have authorized the user (role and warehouse) BEFORE
+// calling this: the pre-check below answers from the table, so a user who may not act must never
+// get that far. Resolves to { replayed, body }; the controller sends the body with the status and,
+// when `replayed`, the header Idempotency-Replayed: true.
+//   work(transaction) -> resource ID; load(resourceId) -> body; access(ctx, body) -> boolean.
+async function run(ctx, target, { work, load, access }) {
+  return respond(ctx, await execute(ctx, target, work), { load, access });
 }
 
 module.exports = { run };
