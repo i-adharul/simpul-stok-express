@@ -174,4 +174,56 @@ describe("StockMovements table", () => {
     expect(rows).toHaveLength(3);
     rows.forEach((row) => expect(row.indexdef).toMatch(/\("organizationId", /));
   });
+
+  describe("append-only trigger", () => {
+    beforeEach(() => insertMovement());
+
+    it("refuses an UPDATE of any column", async () => {
+      await expect(
+        getSequelize().query('UPDATE "StockMovements" SET "note" = \'edited\''),
+      ).rejects.toThrow(/StockMovements rows are append-only: UPDATE/);
+    });
+
+    it("refuses an UPDATE that tries to change the quantity", async () => {
+      await expect(
+        getSequelize().query(
+          'UPDATE "StockMovements" SET "quantityDelta" = 99',
+        ),
+      ).rejects.toThrow(/append-only/);
+    });
+
+    it("refuses a DELETE", async () => {
+      await expect(
+        getSequelize().query('DELETE FROM "StockMovements"'),
+      ).rejects.toThrow(/StockMovements rows are append-only: DELETE/);
+    });
+
+    it("reports the restrict_violation error code", async () => {
+      const error = await getSequelize()
+        .query('DELETE FROM "StockMovements"')
+        .catch((e) => e);
+
+      expect(error.parent.code).toBe("23001");
+    });
+
+    it("leaves the row unchanged after a refused UPDATE", async () => {
+      await getSequelize()
+        .query('UPDATE "StockMovements" SET "quantityDelta" = 99')
+        .catch(() => {});
+      const [rows] = await getSequelize().query(
+        'SELECT "quantityDelta" FROM "StockMovements"',
+      );
+
+      expect(rows).toEqual([{ quantityDelta: 5 }]);
+    });
+
+    it("still accepts new rows", async () => {
+      await insertMovement({ quantityDelta: 7 });
+      const [rows] = await getSequelize().query(
+        'SELECT count(*)::int AS n FROM "StockMovements"',
+      );
+
+      expect(rows[0].n).toBe(2);
+    });
+  });
 });

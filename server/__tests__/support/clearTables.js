@@ -11,9 +11,15 @@ const TABLES_CHILD_FIRST = [
 ];
 const EARLIER_TABLES = ["Subscriptions", "Users", "Organizations", "Plans"];
 
+// A trigger refuses DELETE on these tables (ADR 0005), so they are emptied with TRUNCATE.
+const APPEND_ONLY_TABLES = ["StockMovements"];
+
 async function clearTables(sequelize) {
   for (const table of [...TABLES_CHILD_FIRST, ...EARLIER_TABLES]) {
-    await sequelize.query(`DELETE FROM "${table}"`);
+    const statement = APPEND_ONLY_TABLES.includes(table)
+      ? `TRUNCATE "${table}"`
+      : `DELETE FROM "${table}"`;
+    await sequelize.query(statement);
   }
 }
 

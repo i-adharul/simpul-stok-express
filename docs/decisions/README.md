@@ -10,7 +10,7 @@ The numbers below are reserved from the start so that other documents can refer 
 | 0002 | A flat structure, with services only for risky logic                                     | accepted | E0-01 |
 | 0003 | Database conventions (IDs, names, times, deletes, rules in SQL)                          | accepted | E0-04 |
 | 0004 | Sequelize 6 and `sequelize-cli` for migrations and seeders                               | accepted | E0-04 |
-| 0005 | Immutable stock movements enforced by a database trigger                                 | planned  | E0-05 |
+| 0005 | Immutable stock movements enforced by a database trigger                                 | accepted | E0-05 |
 | 0006 | Tenant integrity enforced by the application, not composite foreign keys                 | planned  | E0-05 |
 | 0007 | Supabase connection strategy (direct or session mode for migrations and locks)           | planned  | E6-04 |
 | 0008 | Deployment layout on EC2 (pm2, Nginx, HTTPS) and the client on Vercel                    | planned  | E6-04 |
