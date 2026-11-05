@@ -41,7 +41,13 @@ const warehouse = {
   countRows: rawCount("Warehouses"),
 };
 
-// Added by the story that adds the route (rule 16): warehouses in E3-01.
+const product = {
+  createRow: async (world, organization) => ({ id: await world.createProduct(organization) }),
+  readRow: rawRow("Products"),
+  countRows: rawCount("Products"),
+};
+
+// Added by the story that adds the route (rule 16): warehouses in E3-01, products in E3-04.
 const TENANT_ENDPOINTS = [
   { method: "get", path: "/api/warehouses", kind: "list", action: "warehouse.read", ...warehouse },
   {
@@ -70,6 +76,8 @@ const TENANT_ENDPOINTS = [
     body: () => ({ name: "Nama Baru" }),
     ...warehouse,
   },
+  { method: "get", path: "/api/products", kind: "list", action: "product.read", ...product },
+  { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
 ];
 
 const METHODS = ["get", "post", "put", "patch", "delete"];
