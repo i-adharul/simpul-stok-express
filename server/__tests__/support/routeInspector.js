@@ -22,6 +22,10 @@ function listRoutes(app) {
         label: `${method.toUpperCase()} ${route.path}`,
         // A route validates when `validate` runs before the last handler (the controller).
         validates: route.stack.slice(0, -1).some((layer) => layer.handle.isValidate === true),
+        // Same idea for the subscription check (rule 17): it must run before the controller.
+        guarded: route.stack
+          .slice(0, -1)
+          .some((layer) => layer.handle.isSubscriptionGuard === true),
       });
     }
   });
@@ -40,4 +44,13 @@ function findUnvalidatedWriteRoutes(app, allowed = []) {
     .filter((label) => !allowed.includes(label));
 }
 
-module.exports = { listRoutes, findUnvalidatedWriteRoutes };
+// Write routes without subscriptionGuard before the controller, minus the allowed ones.
+function findUnguardedWriteRoutes(app, allowed = []) {
+  return listRoutes(app)
+    .filter(isWrite)
+    .filter((route) => !route.guarded)
+    .map((route) => route.label)
+    .filter((label) => !allowed.includes(label));
+}
+
+module.exports = { listRoutes, findUnvalidatedWriteRoutes, findUnguardedWriteRoutes };
