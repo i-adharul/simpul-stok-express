@@ -29,6 +29,7 @@
 //
 const { ACTIONS } = require("../../helpers/permissions");
 const { getSequelize } = require("./db");
+const { createStockLevel } = require("./factories");
 
 // The row as it is in the database (raw SQL, so the check does not depend on the code it checks).
 const rawRow = (table) => async (id) =>
@@ -106,6 +107,24 @@ const TENANT_ENDPOINTS = [
       },
     ],
     ...warehouse,
+  },
+  // The stock summary (E4-06). The answer shows warehouse and product ids, not the stock row's id,
+  // so `createRow` makes a warehouse with a stocked product and returns the WAREHOUSE id: the list
+  // check looks for it in A's answer and must not find B's.
+  {
+    method: "get",
+    path: "/api/stock",
+    kind: "list",
+    action: "stock.read",
+    listQuery: { pageSize: 100 },
+    warehouseScoped: { request: async (world, warehouseId) => ({ query: { warehouseId } }) },
+    createRow: async (world, organization) => {
+      const warehouseId = await world.createWarehouse(organization);
+      const productId = await world.createProduct(organization);
+      await createStockLevel(world.organizations[organization], warehouseId, productId, 5);
+      return { id: warehouseId };
+    },
+    readRow: rawRow("Warehouses"),
   },
   // Stock receipt (E4-02). The row the endpoint creates is a movement; the warehouse is what a
   // foreign key must be tried on, so `createRow` makes a warehouse (the default for foreignBodies).
