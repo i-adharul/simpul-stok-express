@@ -30,15 +30,22 @@ const withoutOrganizationFilter = (original) =>
     return original.call(this, { ...options, where: own });
   };
 
-const ITEM_ENDPOINTS = TENANT_ENDPOINTS.filter(
-  (entry) => entry.kind === "item" && /^\/api\/(warehouses|products)\/:id$/.test(entry.path),
-);
+// Item endpoints whose only tenant guard is the lookup behind findOwned: the warehouse and product
+// endpoints, and the two warehouse assignment endpoints (the warehouse in the URL is the item).
+const BREAKABLE = /^\/api\/(warehouses|products)\/:id(\/members)?$/;
+const ITEM_ENDPOINTS = TENANT_ENDPOINTS.filter((entry) => entry.kind === "item" && BREAKABLE.test(entry.path));
+// The movement detail has a second guard: even a movement of another organization that was found
+// is refused because its warehouse is not in ctx.warehouseIds. Two layers, so it must keep holding
+// when the organization filter alone is removed.
+const MOVEMENT_ITEM = TENANT_ENDPOINTS.find((entry) => entry.path === "/api/stock/movements/:id");
 
 describe("a findOwned without the organization filter is caught by the tenant harness", () => {
   it("covers the item endpoints of warehouses and products", () => {
     expect(ITEM_ENDPOINTS.map(labelOf).sort()).toEqual([
       "GET /warehouses/:id",
       "PATCH /warehouses/:id",
+      "GET /warehouses/:id/members",
+      "PUT /warehouses/:id/members",
       "GET /products/:id",
       "PATCH /products/:id",
     ].sort());
@@ -57,7 +64,17 @@ describe("a findOwned without the organization filter is caught by the tenant ha
     expect(failures.join("\n")).toMatch(/B's id: expected 404 but got (200|403)/);
   });
 
+  it("the movement detail still holds without the organization filter (its warehouse check is a second layer)", async () => {
+    const original = db.StockMovement.findOne;
+    const spy = jest.spyOn(db.StockMovement, "findOne").mockImplementation(withoutOrganizationFilter(original));
+
+    const failures = await runChecks(app, MOVEMENT_ITEM, world);
+    spy.mockRestore();
+
+    expect(failures).toEqual([]);
+  });
+
   it("the same endpoints pass again once the filter is back", async () => {
-    for (const entry of ITEM_ENDPOINTS) expect(await runChecks(app, entry, world)).toEqual([]);
+    for (const entry of [...ITEM_ENDPOINTS, MOVEMENT_ITEM]) expect(await runChecks(app, entry, world)).toEqual([]);
   });
 });
