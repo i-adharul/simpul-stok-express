@@ -1,0 +1,51 @@
+### Products (E3-04). Local server: cd server && npm run dev
+# Needs the seed: cd server && npx sequelize db:seed:all
+# Log in first (http/auth.http); the token goes into @token below.
+@token = paste-the-token-here
+@baseUrl = http://localhost:3000
+# An ID from the list answer:
+@productId = paste-a-product-id-here
+
+### List: every tenant role. Archived products only for the Owner with includeArchived=true.
+# Expect 200 { items: [{ id, organizationId, sku, name, unit, minStock, archivedAt, createdAt, updatedAt }], total, page, pageSize }
+# There is no search parameter: ?search=... answers 400.
+GET {{baseUrl}}/api/products?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### List with archived products (Owner only)
+GET {{baseUrl}}/api/products?includeArchived=true
+Authorization: Bearer {{token}}
+
+### Invalid query
+# Expect 400 VALIDATION_ERROR with details [{ "source": "query", "path": "pageSize", ... }]
+GET {{baseUrl}}/api/products?page=0&pageSize=101
+Authorization: Bearer {{token}}
+
+### Detail
+# Expect 200 with the product. 404 for a missing, malformed or foreign ID, and for an archived product unless you are the Owner.
+GET {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+
+### Create (Owner only). The SKU has all spaces removed and is stored uppercase; minStock defaults to 0.
+# Expect 201 with the product. 409 CONFLICT "SKU sudah dipakai." when the SKU exists.
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "sku": "teh-botol-450", "name": "Teh Botol 450 ml", "unit": "btl", "minStock": 24 }
+
+### Create with a wrong unit and an unknown field
+# Expect 400 VALIDATION_ERROR, details for "unit" and for "organizationId" ("Field tidak dikenal.")
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "sku": "X1", "name": "Produk X", "unit": "kg", "organizationId": "00000000-0000-4000-8000-000000000000" }
+
+### Update (Owner only, at least one of sku, name, unit, minStock)
+# Expect 200 with the product. 404 for an archived product until it is restored (E3-06).
+PATCH {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Teh Botol 450 ml (baru)", "minStock": 0 }
