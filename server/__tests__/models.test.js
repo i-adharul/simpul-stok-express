@@ -19,6 +19,7 @@ describe("models/index.js", () => {
     ).toEqual([
       "Organization",
       "Plan",
+      "Product",
       "Subscription",
       "User",
       "UserWarehouse",
@@ -57,6 +58,15 @@ describe("models/index.js", () => {
     );
     expect(db.UserWarehouse.associations.Warehouse.associationType).toBe(
       "BelongsTo",
+    );
+  });
+
+  it("links a product to its organization", () => {
+    expect(db.Product.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Organization.associations.Products.associationType).toBe(
+      "HasMany",
     );
   });
 });
