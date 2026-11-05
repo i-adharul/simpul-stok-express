@@ -21,6 +21,8 @@ describe("models/index.js", () => {
       "Plan",
       "Product",
       "StockLevel",
+      "StockMovement",
+      "StockTransfer",
       "Subscription",
       "User",
       "UserWarehouse",
@@ -76,6 +78,21 @@ describe("models/index.js", () => {
       "BelongsTo",
     );
     expect(db.StockLevel.associations.Product.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links a transfer to its two warehouses and its movements", () => {
+    expect(db.StockTransfer.associations.fromWarehouse.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.StockTransfer.associations.toWarehouse.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.StockTransfer.associations.StockMovements.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.StockMovement.associations.StockTransfer.associationType).toBe(
       "BelongsTo",
     );
   });
