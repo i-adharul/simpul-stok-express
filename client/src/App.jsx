@@ -6,6 +6,7 @@ import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
 import LoadingSkeleton from './components/LoadingSkeleton'
 import Login from './views/Login'
+import Profile from './views/Profile'
 import { toast } from './utils/toast'
 import { formatDateTime, formatNumber } from './utils/format'
 
@@ -37,6 +38,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<BaseLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="dashboard" element={<StatesPreview />} />
             <Route path="*" element={<Placeholder title="Halaman belum tersedia" />} />
           </Route>

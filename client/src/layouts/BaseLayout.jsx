@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router'
 import { useAuth } from '../context/authContext'
 import { ROLE_LABELS, visibleNav } from '../constants/navigation'
 
@@ -87,7 +87,7 @@ export default function BaseLayout() {
           </button>
           <span className="hidden text-sm text-base-content/60 lg:inline">{user.organizationName}</span>
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold">{user.name}</span>
+            <Link to="/profile" className="font-semibold hover:underline">{user.name}</Link>
             <button className="btn btn-ghost btn-sm btn-square" title="Keluar dari akun" aria-label="Keluar" onClick={handleLogout}>
               <Icon name="logout" />
             </button>
