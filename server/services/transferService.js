@@ -1,6 +1,7 @@
 const { conflict, forbidden, notFound, validationError } = require("../helpers/errors");
 const { tenant } = require("../helpers/tenantScope");
 const { MAX_QUANTITY } = require("./stockService");
+const { lockWarehouse } = require("./warehouseLock");
 
 // Transfer between warehouses (BL13). Business rules only: no HTTP here, and no transaction of its
 // own; the idempotency service opens it (rule 6, ADR 0012) and passes it to every function.
@@ -66,4 +67,35 @@ function destinationQuantity(current, quantity) {
   return current + quantity;
 }
 
-module.exports = { MAX_ITEMS, assertTransferInput, assertWarehousesUsable, loadTransferItems, destinationQuantity };
+// Locks the two warehouses ONE AFTER THE OTHER in ascending ID order, whichever is the source
+// (rule 7, ADR 0013/0014). Two opposite transfers (A to B and B to A) then both ask for the smaller
+// ID first, so one waits for the other instead of each holding one lock and waiting for the second:
+// no deadlock. The rows come back as they are once the locks are held, so `archivedAt` is read
+// only after nothing can archive the warehouse any more. null means missing or foreign.
+async function lockBothWarehouses(ctx, { fromWarehouseId, toWarehouseId }, transaction) {
+  const ids = [fromWarehouseId, toWarehouseId].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  const rows = new Map();
+  for (const id of ids) rows.set(id, await lockWarehouse(ctx, id, transaction));
+  return { source: rows.get(fromWarehouseId), destination: rows.get(toWarehouseId) };
+}
+
+// Everything a transfer must know before it writes, in the order that keeps it safe: shape (no
+// database), both warehouse locks, the state of the warehouses as seen under the locks, then the
+// products. Returns the locked rows and the items ordered by productId.
+async function prepareTransfer(ctx, input, transaction) {
+  assertTransferInput(input);
+  const { source, destination } = await lockBothWarehouses(ctx, input, transaction);
+  assertWarehousesUsable({ source, destination });
+  const items = await loadTransferItems(ctx, input.items, transaction);
+  return { source, destination, items };
+}
+
+module.exports = {
+  MAX_ITEMS,
+  assertTransferInput,
+  assertWarehousesUsable,
+  loadTransferItems,
+  destinationQuantity,
+  lockBothWarehouses,
+  prepareTransfer,
+};
