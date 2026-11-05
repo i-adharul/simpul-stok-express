@@ -1,4 +1,4 @@
-const { Organization, User } = require("../models");
+const { Organization, User, UserWarehouse, Warehouse } = require("../models");
 
 // Login is the one place that reads a user before any organization is known, so these two calls
 // are not tenant-scoped on purpose. Everything after login loads the user through the request
@@ -33,6 +33,22 @@ const findUserById = (id) =>
     ],
   });
 
+// IDs of the active (not archived) warehouses of one organization, in a stable order. With a
+// `userId` only the warehouses assigned to that user are returned. The organization filter is
+// always applied, so an assignment row that points at a foreign warehouse can never leak it.
+const findActiveWarehouseIds = async (organizationId, userId = null) => {
+  const rows = await Warehouse.findAll({
+    attributes: ["id"],
+    where: { organizationId, archivedAt: null },
+    include: userId
+      ? [{ model: UserWarehouse, attributes: [], where: { userId }, required: true }]
+      : [],
+    order: [["id", "ASC"]],
+    raw: true,
+  });
+  return rows.map((row) => row.id);
+};
+
 // Only the password flows need the hash, so it has its own reader instead of widening findUserById.
 const findUserWithPasswordHash = (id) =>
   User.findByPk(id, { attributes: ["id", "email", "passwordHash"] });
@@ -45,6 +61,7 @@ module.exports = {
   findUserByEmail,
   touchLastLogin,
   findUserById,
+  findActiveWarehouseIds,
   findUserWithPasswordHash,
   savePassword,
 };
