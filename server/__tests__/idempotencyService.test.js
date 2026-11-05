@@ -101,3 +101,57 @@ describe("idempotencyService.run: the effect and the key are one transaction", (
     expect(await keyRows(ctxA.organizationId)).toHaveLength(0);
   });
 });
+
+describe("idempotencyService.run: a twin that finished first", () => {
+  // Both calls pass the pre-check (no key yet) and both reach `work` before either writes. The
+  // gate holds them there, so the race is the same on every run.
+  const raceWork = (ctx, code) => {
+    let started = 0;
+    let open;
+    const gate = new Promise((resolve) => (open = resolve));
+    return () =>
+      jest.fn(async (transaction) => {
+        started += 1;
+        if (started === 2) open();
+        await gate;
+        return (await tenant(ctx).Warehouse.create({ code, name: code }, { transaction })).id;
+      });
+  };
+
+  it("answers the loser as a replay when its work fails on a business rule after the twin committed", async () => {
+    const key = crypto.randomUUID();
+    const makeRaceWork = raceWork(ctxA, "GD-RACE"); // the second insert breaks the unique warehouse code
+
+    const results = await Promise.all([
+      idempotencyService.run(ctxA, { key, endpoint: ENDPOINT }, { work: makeRaceWork() }),
+      idempotencyService.run(ctxA, { key, endpoint: ENDPOINT }, { work: makeRaceWork() }),
+    ]);
+
+    expect(results.map((r) => r.replayed).sort()).toEqual([false, true]);
+    expect(results[0].resourceId).toBe(results[1].resourceId);
+    expect(await countWarehouses(ctxA.organizationId)).toBe(1);
+    expect(await keyRows(ctxA.organizationId)).toHaveLength(1);
+  });
+
+  it("throws the original error when the failure left no key", async () => {
+    const boom = new Error("boom");
+    const work = jest.fn(async () => {
+      throw boom;
+    });
+
+    await expect(idempotencyService.run(ctxA, { key: crypto.randomUUID(), endpoint: ENDPOINT }, { work })).rejects.toBe(boom);
+    expect(await keyRows(ctxA.organizationId)).toHaveLength(0);
+  });
+
+  it("allows the same key again after a failed request", async () => {
+    const key = crypto.randomUUID();
+    await expect(
+      idempotencyService.run(ctxA, { key, endpoint: ENDPOINT }, { work: async () => { throw new Error("first fails"); } }),
+    ).rejects.toThrow("first fails");
+
+    const retry = await idempotencyService.run(ctxA, { key, endpoint: ENDPOINT }, { work: makeWork(ctxA) });
+
+    expect(retry.replayed).toBe(false);
+    expect(await countWarehouses(ctxA.organizationId)).toBe(1);
+  });
+});
