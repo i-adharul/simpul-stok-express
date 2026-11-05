@@ -36,4 +36,20 @@ async function withFailingMovementInsert(body) {
   }
 }
 
-module.exports = { sql, send, quantityOf, levelRows, movementRows, ledgerSum, keyRows, withFailingMovementInsert };
+// While `body` runs, every INSERT of a stock row (StockLevels) fails inside the database. A transfer
+// creates the destination row only AFTER every source row was decremented, so this is the way to
+// make it fail exactly between the two halves (E5-02) without touching the code under test: no spy
+// on a function name, so a refactor of the service cannot silently turn the test into a no-op.
+// An UPDATE of an existing row is not affected, so the source decrement itself still succeeds.
+async function withFailingStockLevelInsert(body) {
+  await sql(`CREATE OR REPLACE FUNCTION fail_stock_level_insert() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'stock level insert failed on purpose'; END; $$ LANGUAGE plpgsql`);
+  await sql(`CREATE TRIGGER fail_stock_level_insert_trg BEFORE INSERT ON "StockLevels" FOR EACH ROW EXECUTE FUNCTION fail_stock_level_insert()`);
+  try {
+    return await body();
+  } finally {
+    await sql(`DROP TRIGGER IF EXISTS fail_stock_level_insert_trg ON "StockLevels"`);
+    await sql(`DROP FUNCTION IF EXISTS fail_stock_level_insert()`);
+  }
+}
+
+module.exports = { sql, send, quantityOf, levelRows, movementRows, ledgerSum, keyRows, withFailingMovementInsert, withFailingStockLevelInsert };
