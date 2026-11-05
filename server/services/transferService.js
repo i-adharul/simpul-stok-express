@@ -1,5 +1,6 @@
 const { Op, literal } = require("sequelize");
 const { conflict, forbidden, insufficientStock, notFound, validationError } = require("../helpers/errors");
+const { findOwned } = require("../helpers/ownership");
 const { tenant } = require("../helpers/tenantScope");
 const { MAX_QUANTITY } = require("./stockService");
 const { createWithCode } = require("./transferCode");
@@ -191,6 +192,55 @@ async function getTransfer(ctx, id) {
   };
 }
 
+// The detail of one transfer (S12). Four situations are ONE 404: a malformed ID, a missing one,
+// another organization's (findOwned), and a transfer whose two warehouses are both out of the
+// caller's reach (ctx.warehouseIds: the active warehouses of an Owner, the assigned ones for the
+// others). Seeing ONE of the two is enough (BL13: the recipient reads it in the history).
+// The related rows are read with separate scoped queries, not an include (ADR 0011). A movement ID
+// is given only for a warehouse the caller reaches, because P13 answers 404 for any other; no stock
+// balance and no email ever leave here.
+async function getTransferDetail(ctx, id) {
+  const transfer = await findOwned(ctx, "StockTransfer", id);
+  const reaches = (warehouseId) => ctx.warehouseIds.includes(warehouseId);
+  if (!reaches(transfer.fromWarehouseId) && !reaches(transfer.toWarehouseId)) throw notFound();
+
+  const scoped = tenant(ctx);
+  const [from, to, createdBy, movements] = await Promise.all([
+    scoped.Warehouse.findByPk(transfer.fromWarehouseId, { attributes: ["id", "code", "name", "address"] }),
+    scoped.Warehouse.findByPk(transfer.toWarehouseId, { attributes: ["id", "code", "name", "address"] }),
+    transfer.createdById ? scoped.User.findByPk(transfer.createdById, { attributes: ["id", "name", "role"] }) : null,
+    scoped.StockMovement.findAll({ where: { transferId: transfer.id }, order: [["productId", "ASC"]] }),
+  ]);
+  const out = movements.filter((movement) => movement.type === "TRANSFER_OUT");
+  const into = new Map(movements.filter((movement) => movement.type === "TRANSFER_IN").map((movement) => [movement.productId, movement]));
+  const products = await scoped.Product.findAll({ where: { id: out.map((movement) => movement.productId) }, attributes: ["id", "sku", "name", "unit"] });
+  const productById = new Map(products.map((product) => [product.id, product]));
+
+  const place = (warehouse) => ({ id: warehouse.id, code: warehouse.code, name: warehouse.name, address: warehouse.address });
+  return {
+    id: transfer.id,
+    code: transfer.code,
+    note: transfer.note,
+    createdAt: transfer.createdAt,
+    createdBy: createdBy ? { id: createdBy.id, name: createdBy.name, role: createdBy.role } : null,
+    fromWarehouse: place(from),
+    toWarehouse: place(to),
+    items: out.map((movement) => {
+      const product = productById.get(movement.productId);
+      const received = into.get(movement.productId);
+      return {
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        unit: product.unit,
+        quantity: -movement.quantityDelta,
+        outMovementId: reaches(transfer.fromWarehouseId) ? movement.id : null,
+        inMovementId: received && reaches(transfer.toWarehouseId) ? received.id : null,
+      };
+    }),
+  };
+}
+
 module.exports = {
   MAX_ITEMS,
   assertTransferInput,
@@ -205,4 +255,5 @@ module.exports = {
   writeMovements,
   transfer,
   getTransfer,
+  getTransferDetail,
 };

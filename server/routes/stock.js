@@ -70,4 +70,8 @@ router.post(
   transferController.create,
 );
 
+// One transfer (S12). No schema: a malformed ID is a 404 from the service, like every ID in a URL
+// (rule 2). Fixed paths under /stock/transfers must be declared BEFORE this one, or ":id" takes them.
+router.get("/stock/transfers/:id", authentication, requireRole("history.read"), transferController.show);
+
 module.exports = router;
