@@ -1,4 +1,5 @@
-const { conflict, forbidden, notFound, validationError } = require("../helpers/errors");
+const { Op, literal } = require("sequelize");
+const { conflict, forbidden, insufficientStock, notFound, validationError } = require("../helpers/errors");
 const { tenant } = require("../helpers/tenantScope");
 const { MAX_QUANTITY } = require("./stockService");
 const { lockWarehouse } = require("./warehouseLock");
@@ -90,6 +91,50 @@ async function prepareTransfer(ctx, input, transaction) {
   return { source, destination, items };
 }
 
+// Rule 8: the decrement is ONE conditional UPDATE, "quantity - n WHERE quantity >= n", and the
+// affected-row count is the verdict: 0 rows means the source cannot cover the item (or has no row
+// at all), so nothing was changed by this statement. `quantity` is a checked integer, so putting it
+// into the literal is safe. The CHECK (quantity >= 0) in the database stays the last safety net.
+async function decrementSource(ctx, warehouseId, { productId, quantity }, transaction) {
+  if (!Number.isInteger(quantity)) throw new Error("decrementSource: quantity must be an integer");
+  const [changed] = await tenant(ctx).StockLevel.update(
+    { quantity: literal(`"quantity" - ${quantity}`) },
+    { where: { warehouseId, productId, quantity: { [Op.gte]: quantity } }, transaction },
+  );
+  if (changed !== 1) throw insufficientStock(productId);
+}
+
+// ALL source decrements come first, in productId order (rule 6). The first item the source cannot
+// cover stops the transfer with 409 INSUFFICIENT_STOCK and its productId, before the destination is
+// touched; the throw rolls back the decrements already made in this transaction ("nothing is written").
+async function decrementSources(ctx, warehouseId, items, transaction) {
+  for (const item of items) await decrementSource(ctx, warehouseId, item, transaction);
+}
+
+// The destination, after the sources. The rows that exist are read once (the warehouse lock is
+// held, so nobody changes them meanwhile) and every new total is checked against the column limit
+// BEFORE the first write, so a 409 leaves nothing half done even before the rollback. A row that
+// is missing is created (BL13); one that exists is increased.
+async function incrementDestinations(ctx, warehouseId, items, transaction) {
+  const levels = tenant(ctx).StockLevel;
+  const rows = await levels.findAll({ where: { warehouseId, productId: items.map((item) => item.productId) }, transaction });
+  const byProduct = new Map(rows.map((row) => [row.productId, row]));
+  const totals = items.map((item) => destinationQuantity(byProduct.get(item.productId)?.quantity ?? 0, item.quantity));
+
+  for (const [index, item] of items.entries()) {
+    const row = byProduct.get(item.productId);
+    if (row) await row.update({ quantity: totals[index] }, { transaction });
+    else await levels.create({ warehouseId, productId: item.productId, quantity: totals[index] }, { transaction });
+  }
+}
+
+// The stock half of a transfer: sources first, then the destination. `items` is already ordered by
+// productId (loadTransferItems). Writes stock only; the movements and the header come later.
+async function moveStock(ctx, { fromWarehouseId, toWarehouseId, items }, transaction) {
+  await decrementSources(ctx, fromWarehouseId, items, transaction);
+  await incrementDestinations(ctx, toWarehouseId, items, transaction);
+}
+
 module.exports = {
   MAX_ITEMS,
   assertTransferInput,
@@ -98,4 +143,7 @@ module.exports = {
   destinationQuantity,
   lockBothWarehouses,
   prepareTransfer,
+  decrementSources,
+  incrementDestinations,
+  moveStock,
 };
