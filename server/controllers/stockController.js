@@ -3,6 +3,7 @@ const { can } = require("../helpers/permissions");
 const { tenant } = require("../helpers/tenantScope");
 const idempotencyService = require("../services/idempotencyService");
 const stockService = require("../services/stockService");
+const stockHistoryService = require("../services/stockHistoryService");
 const stockSummaryService = require("../services/stockSummaryService");
 
 // Only immutable data of the movement leaves the server, never the balance, so a replay is equal
@@ -78,4 +79,9 @@ async function list(req, res) {
   res.status(200).json(await stockSummaryService.listStock(req.ctx, req.valid.query));
 }
 
-module.exports = { receive, adjust, list };
+// The role was checked by the route; the service limits the answer to the caller's warehouses.
+async function listMovements(req, res) {
+  res.status(200).json(await stockHistoryService.listMovements(req.ctx, req.valid.query));
+}
+
+module.exports = { receive, adjust, list, listMovements };
