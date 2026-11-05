@@ -17,6 +17,10 @@
 //   supportsCursor  optional true: a list that takes a cursor; `cursorParam` names it (default "cursor")
 //   idempotent    optional true: the endpoint needs an Idempotency-Key
 //   foreignBodies optional [{ key, body: (world, id) => a body whose `key` holds `id` }]
+//   warehouseScoped optional { request: async (world, warehouseId) => { id?, body?, query? } }
+//                 for an endpoint whose answer depends on the caller's warehouse assignment (a
+//                 warehouse-level action, or the warehouse detail): builds the request for that
+//                 warehouse, so the role tests can try an assigned and an unassigned one
 //
 // There are no tenant endpoints yet; the first entries arrive with the warehouse API (E3-01).
 const { ACTIONS } = require("../../helpers/permissions");
@@ -59,6 +63,9 @@ function validateEntry(entry) {
     if (!Array.isArray(entry.foreignBodies) || entry.foreignBodies.some((f) => !f.key || typeof f.body !== "function")) {
       problems.push("foreignBodies must be a list of { key, body(world, id) }");
     }
+  }
+  if (entry.warehouseScoped && typeof entry.warehouseScoped.request !== "function") {
+    problems.push("warehouseScoped must be { request(world, warehouseId) }");
   }
   return problems;
 }

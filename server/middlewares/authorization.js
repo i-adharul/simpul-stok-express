@@ -13,12 +13,16 @@ function requireCan(action) {
     throw new Error(`requireCan takes organization-level actions only, got: ${action}`);
   }
 
-  return function authorize(req, res, next) {
+  function authorize(req, res, next) {
     // Authentication must come first. A missing context is a bug in the route, not a 403.
     if (!req.ctx) throw new Error("requireCan needs req.ctx: put authentication before it");
     if (!can(req.ctx, action)) return next(forbidden());
     return next();
-  };
+  }
+
+  // A marker for the consistency test (every action must be used by a route), like `isValidate`.
+  authorize.action = action;
+  return authorize;
 }
 
 module.exports = { requireCan };

@@ -217,6 +217,9 @@ const FLAWS = [
   ["replayCreatesAgain", "create", "idempotentReplay"],
 ];
 
+// Flaws that are caught by the role checks of roleMatrix.test.js instead of the harness.
+const ROLE_FLAWS = ["refusesViewerRead", "ignoresAssignment", "detailIgnoresAssignment"];
+
 describe("every deliberate flaw is caught by the check meant for it", () => {
   it.each(FLAWS)("%s on the %s route is caught by %s", async (flaw, entryName, checkName) => {
     const { app, store } = buildFakeApp({ [flaw]: true });
@@ -231,6 +234,6 @@ describe("every deliberate flaw is caught by the check meant for it", () => {
     const source = fs.readFileSync(require.resolve("./support/fakeTenantApp"), "utf8");
     const known = [...source.matchAll(/flaws\.(\w+)/g)].map((m) => m[1]);
 
-    expect([...new Set(known)].sort()).toEqual([...new Set(FLAWS.map(([flaw]) => flaw))].sort());
+    expect([...new Set(known)].sort()).toEqual([...new Set([...FLAWS.map(([flaw]) => flaw), ...ROLE_FLAWS])].sort());
   });
 });

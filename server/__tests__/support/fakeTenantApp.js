@@ -8,6 +8,8 @@ const authentication = require("../../middlewares/authentication");
 const { requireCan } = require("../../middlewares/authorization");
 const { errorHandler } = require("../../middlewares/errorHandler");
 const { forbidden, notFound, validationError } = require("../../helpers/errors");
+const { can, roleAllows } = require("../../helpers/permissions");
+const { getSequelize } = require("./db");
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,8 +36,14 @@ function buildFakeApp(flaws = {}) {
         next();
       }
     : authentication;
-  // Flaw "noRoleCheck": the route forgets the role check.
-  const guard = (action) => (flaws.noRoleCheck ? (req, res, next) => next() : requireCan(action));
+  // Flaw "noRoleCheck": the route forgets the role check. Flaw "refusesViewerRead": it refuses a
+  // Viewer a read that the matrix allows.
+  const guard = (action) => {
+    if (flaws.noRoleCheck) return (req, res, next) => next();
+    const check = requireCan(action);
+    if (!flaws.refusesViewerRead || action !== "warehouse.read") return check;
+    return (req, res, next) => (req.ctx.role === "VIEWER" ? next(forbidden()) : check(req, res, next));
+  };
 
   // Own row, or the same 404 as for a missing row. Flaw "foreign403" answers 403 for another
   // organization's row, which tells the caller that the row exists.
@@ -122,6 +130,26 @@ function buildFakeApp(flaws = {}) {
     res.status(201).json({ data: store.add(organizationId, body.name ?? "thing") });
   });
 
+  // Warehouse-level action: the role AND the assignment decide, in the handler, because the
+  // warehouseId is only known after the body is read. Flaw "ignoresAssignment" checks the role only.
+  router.post("/receive", authenticate, express.json(), (req, res) => {
+    const { warehouseId } = readBody(req.body, ["warehouseId"]);
+    const allowed = flaws.ignoresAssignment ? roleAllows(req.ctx.role, "stock.receive") : can(req.ctx, "stock.receive", { warehouseId });
+    if (!allowed) throw forbidden();
+    res.status(201).json({ data: { warehouseId } });
+  });
+
+  // Warehouse detail: any tenant role may read (organization-level), but a Warehouse Admin or a
+  // Viewer only an assigned warehouse (403); the Owner gets 404 for a warehouse that is not active.
+  // Flaw "detailIgnoresAssignment" lets everyone in.
+  router.get("/warehouses/:id", authenticate, guard("warehouse.read"), (req, res) => {
+    const inContext = req.ctx.warehouseIds.includes(req.params.id);
+    if (!inContext && !flaws.detailIgnoresAssignment) {
+      throw req.ctx.role === "OWNER" ? notFound() : forbidden();
+    }
+    res.json({ data: { id: req.params.id } });
+  });
+
   const app = express();
   app.use("/api", router);
   app.use(errorHandler);
@@ -151,6 +179,27 @@ function fakeEntries(store) {
       createRow,
       readRow,
       supportsCursor: true,
+    },
+    receive: {
+      method: "post",
+      path: "/api/receive",
+      kind: "create",
+      action: "stock.receive",
+      createRow,
+      readRow,
+      body: () => ({ warehouseId: "33333333-3333-4333-8333-333333333333" }),
+      countRows: async (organizationId) => store.count(organizationId),
+      warehouseScoped: { request: async (world, warehouseId) => ({ body: { warehouseId } }) },
+    },
+    detail: {
+      method: "get",
+      path: "/api/warehouses/:id",
+      kind: "item",
+      action: "warehouse.read",
+      createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
+      readRow: async (id) =>
+        (await getSequelize().query('SELECT * FROM "Warehouses" WHERE "id" = :id', { replacements: { id } }))[0][0] ?? null,
+      warehouseScoped: { request: async (world, warehouseId) => ({ id: warehouseId }) },
     },
     create: {
       method: "post",

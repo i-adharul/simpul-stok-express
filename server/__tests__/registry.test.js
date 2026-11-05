@@ -70,6 +70,7 @@ describe("validateEntry", () => {
     [{ kind: "create", method: "post", path: "/api/things" }, /countRows/],
     [{ method: "get", idempotent: true, countRows: async () => 0 }, /cannot be idempotent/],
     [{ foreignBodies: [{ key: "warehouseId" }] }, /foreignBodies/],
+    [{ warehouseScoped: {} }, /warehouseScoped/],
   ])("rejects %p", (extra, message) => {
     expect(validateEntry(valid(extra)).join(" | ")).toMatch(message);
   });
