@@ -24,12 +24,14 @@ const createProductSchema = z.object({
 });
 
 // No default here: a field that is not sent must stay as it is. At least one field is required.
+// `archived`: true archives, false restores (BL09).
 const updateProductSchema = z
   .object({
     sku: sku.optional(),
     name: name.optional(),
     unit: unit.optional(),
     minStock: minStock.optional(),
+    archived: z.boolean().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, {
     message: "Minimal satu field wajib diisi.",
