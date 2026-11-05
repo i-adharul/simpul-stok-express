@@ -3,6 +3,7 @@ import BaseLayout from './layouts/BaseLayout'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
 import LoadingSkeleton from './components/LoadingSkeleton'
+import { toast } from './utils/toast'
 import { formatDateTime, formatNumber } from './utils/format'
 
 // Temporary user until E1-04 adds AuthContext (login and session).
@@ -22,7 +23,7 @@ function StatesPreview() {
       </p>
       <LoadingSkeleton rows={3} />
       <EmptyState message="Belum ada gudang." actionLabel="Tambah gudang" />
-      <ErrorState onRetry={() => {}} />
+      <ErrorState onRetry={() => toast.info('Mencoba lagi...')} />
     </div>
   )
 }
