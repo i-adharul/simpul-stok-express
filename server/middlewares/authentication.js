@@ -22,6 +22,16 @@ function readPayload(token) {
   }
 }
 
+// A token is refused when it was issued before the last password change (BL01), so changing the
+// password signs out every other device. Both sides are compared in whole seconds because `iat`
+// has no fraction. KNOWN LIMIT: a token issued in the same second as the change is still accepted.
+// A token without a numeric `iat` cannot be placed in time, so it is refused when a change exists.
+function issuedBeforePasswordChange(iat, passwordChangedAt) {
+  if (!passwordChangedAt) return false;
+  if (typeof iat !== "number") return true;
+  return iat < Math.floor(new Date(passwordChangedAt).getTime() / 1000);
+}
+
 // Protected routes start here. The token proves who the caller is; everything else (role,
 // organization, status) is read from the database on every request, never from the token, so a
 // deactivation or a role change takes effect at once (BL01, BL07). Every failure is the same
@@ -33,6 +43,9 @@ async function authentication(req, res, next) {
 
   const user = await findUserById(payload.sub);
   if (!user || !user.isActive) return next(unauthenticated());
+  if (issuedBeforePasswordChange(payload.iat, user.passwordChangedAt)) {
+    return next(unauthenticated());
+  }
 
   // E2-03 builds req.ctx from this; until then handlers read req.user.
   req.user = user.get({ plain: true });
@@ -40,3 +53,4 @@ async function authentication(req, res, next) {
 }
 
 module.exports = authentication;
+module.exports.issuedBeforePasswordChange = issuedBeforePasswordChange;

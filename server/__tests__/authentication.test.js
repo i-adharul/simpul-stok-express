@@ -153,3 +153,64 @@ describe("authentication: every failure is the same 401", () => {
     expectRejected(await get(`Bearer ${token}`));
   });
 });
+
+describe("authentication: a token issued before the last password change", () => {
+  const sign = (userId, iat) =>
+    jwt.sign({ iat }, env.JWT_SECRET, { subject: userId, expiresIn: "8h" });
+  const NOW = Math.floor(Date.now() / 1000);
+
+  it("is rejected when it was issued seconds before the change", async () => {
+    const changedAt = new Date((NOW - 10) * 1000);
+    const user = await createAccount({ passwordChangedAt: changedAt });
+
+    expectRejected(await get(`Bearer ${sign(user.id, NOW - 20)}`));
+    expectRejected(await get(`Bearer ${sign(user.id, NOW - 11)}`));
+  });
+
+  it("is accepted when it was issued in the same second as the change (known limit)", async () => {
+    // passwordChangedAt has milliseconds; the comparison uses whole seconds, so the token of the
+    // second in which the password changed still works. Documented in docs/04, Authentication.
+    const changedAt = new Date((NOW - 10) * 1000 + 900);
+    const user = await createAccount({ passwordChangedAt: changedAt });
+
+    const res = await get(`Bearer ${sign(user.id, NOW - 10)}`);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("is accepted when it was issued after the change", async () => {
+    const user = await createAccount({ passwordChangedAt: new Date((NOW - 10) * 1000) });
+
+    expect((await get(`Bearer ${sign(user.id, NOW - 9)}`)).status).toBe(200);
+    expect((await get(`Bearer ${signToken(user.id)}`)).status).toBe(200);
+  });
+
+  it("does not matter when the password was never changed", async () => {
+    const user = await createAccount({ passwordChangedAt: null });
+
+    expect((await get(`Bearer ${sign(user.id, NOW - 3600)}`)).status).toBe(200);
+  });
+});
+
+describe("issuedBeforePasswordChange", () => {
+  const { issuedBeforePasswordChange } = authentication;
+
+  it("compares whole seconds", () => {
+    const changedAt = new Date("2026-11-05T10:00:00.900Z");
+    const second = Math.floor(changedAt.getTime() / 1000);
+
+    expect(issuedBeforePasswordChange(second - 1, changedAt)).toBe(true);
+    expect(issuedBeforePasswordChange(second, changedAt)).toBe(false);
+    expect(issuedBeforePasswordChange(second + 1, changedAt)).toBe(false);
+  });
+
+  it("is false when there is no change date", () => {
+    expect(issuedBeforePasswordChange(1, null)).toBe(false);
+    expect(issuedBeforePasswordChange(1, undefined)).toBe(false);
+  });
+
+  it("is true when the token has no usable issue time but a change date exists", () => {
+    expect(issuedBeforePasswordChange(undefined, new Date())).toBe(true);
+    expect(issuedBeforePasswordChange("1", new Date())).toBe(true);
+  });
+});
