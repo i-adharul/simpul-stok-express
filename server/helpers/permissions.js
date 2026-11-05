@@ -42,4 +42,15 @@ function getAction(action) {
 // Role alone. An unknown role is denied.
 const roleAllows = (role, action) => getAction(action).roles.includes(role);
 
-module.exports = { ROLES, ACTIONS, getAction, roleAllows };
+// ctx.warehouseIds is already the right list for every role: all active warehouses for an Owner,
+// the assigned active ones for a Warehouse Admin or a Viewer (helpers/requestContext.js). So the
+// warehouse check is one membership test. An organization-level action ignores the warehouse.
+// Without a usable warehouseId a warehouse-level action is denied: never "allowed by default".
+function can(ctx, action, { warehouseId } = {}) {
+  const { level } = getAction(action);
+  if (!roleAllows(ctx?.role, action)) return false;
+  if (level === "organization") return true;
+  return typeof warehouseId === "string" && Array.isArray(ctx.warehouseIds) && ctx.warehouseIds.includes(warehouseId);
+}
+
+module.exports = { ROLES, ACTIONS, getAction, roleAllows, can };

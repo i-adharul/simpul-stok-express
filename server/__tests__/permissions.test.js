@@ -1,4 +1,4 @@
-const { ACTIONS, ROLES, roleAllows } = require("../helpers/permissions");
+const { ACTIONS, ROLES, can, roleAllows } = require("../helpers/permissions");
 
 const ORG_ACTIONS = [
   "warehouse.read",
@@ -69,5 +69,71 @@ describe("roleAllows: who may do what (role alone)", () => {
 
   it("treats an unknown action as a programming error", () => {
     expect(() => roleAllows("OWNER", "stock.delete")).toThrow(/Unknown action/);
+  });
+});
+
+describe("can(ctx, action, { warehouseId })", () => {
+  const W1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const W2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const W3 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const ctx = (role, warehouseIds) => ({ userId: "u", organizationId: "o", role, warehouseIds });
+
+  describe("warehouse-level actions", () => {
+    it("lets an Owner act in every warehouse of the context (all active ones)", () => {
+      const owner = ctx("OWNER", [W1, W2]);
+
+      expect(can(owner, "stock.receive", { warehouseId: W1 })).toBe(true);
+      expect(can(owner, "stock.receive", { warehouseId: W2 })).toBe(true);
+    });
+
+    it("denies an Owner a warehouse that is not active or not theirs (not in the context)", () => {
+      expect(can(ctx("OWNER", [W1]), "stock.receive", { warehouseId: W3 })).toBe(false);
+    });
+
+    it("lets a Warehouse Admin act only in the assigned warehouses", () => {
+      const admin = ctx("WAREHOUSE_ADMIN", [W1]);
+
+      expect(can(admin, "stock.adjust", { warehouseId: W1 })).toBe(true);
+      expect(can(admin, "stock.adjust", { warehouseId: W2 })).toBe(false);
+    });
+
+    it("lets a Viewer read, but not write, in the assigned warehouses", () => {
+      const viewer = ctx("VIEWER", [W1]);
+
+      expect(can(viewer, "stock.read", { warehouseId: W1 })).toBe(true);
+      expect(can(viewer, "history.read", { warehouseId: W1 })).toBe(true);
+      expect(can(viewer, "stock.receive", { warehouseId: W1 })).toBe(false);
+      expect(can(viewer, "stock.read", { warehouseId: W2 })).toBe(false);
+    });
+
+    it("denies a Platform admin everywhere", () => {
+      expect(can(ctx("PLATFORM_ADMIN", []), "stock.read", { warehouseId: W1 })).toBe(false);
+    });
+
+    it.each([[undefined], [null], [""], [{}]])("denies when no usable warehouseId is given: %j", (warehouseId) => {
+      expect(can(ctx("OWNER", [W1]), "stock.read", { warehouseId })).toBe(false);
+      expect(can(ctx("OWNER", [W1]), "stock.read")).toBe(false);
+    });
+
+    it("denies a context without a warehouse list", () => {
+      expect(can({ role: "OWNER" }, "stock.read", { warehouseId: W1 })).toBe(false);
+    });
+  });
+
+  describe("organization-level actions", () => {
+    it("are decided by role alone and ignore the warehouse list", () => {
+      expect(can(ctx("OWNER", []), "warehouse.manage")).toBe(true);
+      expect(can(ctx("VIEWER", [W1]), "warehouse.manage")).toBe(false);
+      expect(can(ctx("WAREHOUSE_ADMIN", []), "transfer.destinations")).toBe(true);
+      expect(can(ctx("VIEWER", [W1]), "transfer.destinations")).toBe(false);
+    });
+
+    it("do not need a warehouseId", () => {
+      expect(can(ctx("VIEWER", []), "warehouse.read")).toBe(true);
+    });
+  });
+
+  it("treats an unknown action as a programming error", () => {
+    expect(() => can(ctx("OWNER", [W1]), "stock.delete", { warehouseId: W1 })).toThrow(/Unknown action/);
   });
 });
