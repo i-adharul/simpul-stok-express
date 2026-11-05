@@ -284,3 +284,100 @@ describe("POST /api/warehouses", () => {
     expect(await warehouseRows(orgA())).toHaveLength(0);
   });
 });
+
+describe("PATCH /api/warehouses/:id", () => {
+  const readWarehouse = async (id) => (await sql(`SELECT * FROM "Warehouses" WHERE "id" = :id`, { id }))[0];
+
+  it("updates code, name and address with the same rules as POST", async () => {
+    const id = await world.createWarehouse("A", "GD-1");
+
+    const res = await send("patch", `/api/warehouses/${id}`, { code: " gd-2 ", name: " Baru ", address: " Jl. Baru " });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id, code: "GD-2", name: "Baru", address: "Jl. Baru", organizationId: orgA() });
+    expect(await readWarehouse(id)).toMatchObject({ code: "GD-2", name: "Baru", address: "Jl. Baru" });
+  });
+
+  it("changes only the fields that were sent, and clears the address with an empty string", async () => {
+    const id = await world.createWarehouse("A", "GD-1");
+    await sql(`UPDATE "Warehouses" SET "address" = 'Lama' WHERE "id" = :id`, { id });
+
+    const renamed = await send("patch", `/api/warehouses/${id}`, { name: "Nama Baru" });
+    expect(renamed.body).toMatchObject({ code: "GD-1", name: "Nama Baru", address: "Lama" });
+
+    const cleared = await send("patch", `/api/warehouses/${id}`, { address: "" });
+    expect(cleared.body).toMatchObject({ name: "Nama Baru", address: null });
+  });
+
+  it("answers 409 when the code belongs to another warehouse of the organization", async () => {
+    await world.createWarehouse("A", "GD-1");
+    const id = await world.createWarehouse("A", "GD-2");
+
+    const res = await send("patch", `/api/warehouses/${id}`, { code: "gd-1" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ code: "CONFLICT", message: "Kode gudang sudah dipakai.", details: null });
+    expect((await readWarehouse(id)).code).toBe("GD-2");
+  });
+
+  it("accepts the warehouse's own code again and a code used in another organization", async () => {
+    await world.createWarehouse("B", "GD-X");
+    const id = await world.createWarehouse("A", "GD-1");
+
+    expect((await send("patch", `/api/warehouses/${id}`, { code: "GD-1" })).status).toBe(200);
+    expect((await send("patch", `/api/warehouses/${id}`, { code: "GD-X" })).status).toBe(200);
+  });
+
+  it("answers the same 404 for another organization's warehouse, a missing ID and a malformed ID, and changes nothing", async () => {
+    const foreign = await world.createWarehouse("B", "GD-B");
+
+    const answers = [
+      await send("patch", `/api/warehouses/${foreign}`, { name: "Dibajak" }),
+      await send("patch", "/api/warehouses/33333333-3333-4333-8333-333333333333", { name: "Dibajak" }),
+      await send("patch", "/api/warehouses/not-a-uuid", { name: "Dibajak" }),
+    ];
+
+    for (const res of answers) expect(res.status).toBe(404);
+    expect(new Set(answers.map((r) => r.text)).size).toBe(1);
+    expect((await readWarehouse(foreign)).name).not.toBe("Dibajak");
+  });
+
+  it.each([
+    [{}, "an empty body"],
+    [{ organizationId: "x" }, "organizationId"],
+    [{ archived: true }, "archived (delivered in E3-03)"],
+    [{ name: "" }, "an empty name"],
+    [{ code: "A".repeat(21) }, "a code that is too long"],
+    [{ address: "x".repeat(256) }, "an address that is too long"],
+  ])("answers 400 for %j (%s)", async (body) => {
+    const id = await world.createWarehouse("A", "GD-1");
+
+    const res = await send("patch", `/api/warehouses/${id}`, body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("does not move the warehouse to another organization", async () => {
+    const id = await world.createWarehouse("A");
+
+    await send("patch", `/api/warehouses/${id}`, { name: "X", organizationId: world.organizations.B });
+
+    expect((await readWarehouse(id)).organizationId).toBe(orgA());
+  });
+
+  it("answers 404 for an archived warehouse (it can only be restored, delivered in E3-03)", async () => {
+    const id = await archivedWarehouse("GD-OLD");
+
+    expect((await send("patch", `/api/warehouses/${id}`, { name: "X" })).status).toBe(404);
+  });
+
+  it.each(["WAREHOUSE_ADMIN", "VIEWER"])("answers 403 to a %s, also for another organization's ID", async (role) => {
+    const own = await world.createWarehouse("A");
+    const foreign = await world.createWarehouse("B");
+
+    expect((await send("patch", `/api/warehouses/${own}`, { name: "X" }, role)).status).toBe(403);
+    expect((await send("patch", `/api/warehouses/${foreign}`, { name: "X" }, role)).status).toBe(403);
+    expect((await readWarehouse(own)).name).not.toBe("X");
+  });
+});

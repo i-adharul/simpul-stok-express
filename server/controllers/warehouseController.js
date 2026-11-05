@@ -86,4 +86,13 @@ async function create(req, res) {
   res.status(201).json(toWarehouse(row));
 }
 
-module.exports = { list, show, create, toWarehouse };
+// An archived warehouse is not found here (404): E3-03 lets it through for a restore only.
+async function update(req, res) {
+  const warehouse = await findOwned(req.ctx, "Warehouse", req.params.id);
+  if (warehouse.archivedAt) throw notFound();
+
+  await warehouse.update(req.valid.body).catch(rethrowDuplicateCode);
+  res.status(200).json(toWarehouse(warehouse));
+}
+
+module.exports = { list, show, create, update, toWarehouse };

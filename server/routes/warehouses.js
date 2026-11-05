@@ -5,7 +5,9 @@ const { requireCan } = require("../middlewares/authorization");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { createWarehouseSchema, warehouseListQuerySchema } = require("../schemas/warehouse.schema");
+const { createWarehouseSchema,
+  updateWarehouseSchema,
+  warehouseListQuerySchema } = require("../schemas/warehouse.schema");
 
 const router = express.Router();
 
@@ -32,6 +34,16 @@ router.post(
   subscriptionGuard,
   validate({ body: createWarehouseSchema }),
   warehouseController.create,
+);
+
+// The ID is not validated here (a malformed ID is 404 from findOwned); only the body is.
+router.patch(
+  "/warehouses/:id",
+  authentication,
+  requireCan("warehouse.manage"),
+  subscriptionGuard,
+  validate({ body: updateWarehouseSchema }),
+  warehouseController.update,
 );
 
 module.exports = router;

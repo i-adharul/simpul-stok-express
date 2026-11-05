@@ -62,6 +62,14 @@ const TENANT_ENDPOINTS = [
     body: () => ({ code: `NEW-${Math.random().toString(36).slice(2, 10)}`, name: "Gudang Baru" }),
     ...warehouse,
   },
+  {
+    method: "patch",
+    path: "/api/warehouses/:id",
+    kind: "item",
+    action: "warehouse.manage",
+    body: () => ({ name: "Nama Baru" }),
+    ...warehouse,
+  },
 ];
 
 const METHODS = ["get", "post", "put", "patch", "delete"];
