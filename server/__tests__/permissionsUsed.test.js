@@ -14,8 +14,6 @@ const { TENANT_ENDPOINTS } = require("./support/registry");
 // the test fails when an action listed here is used (remove it) and when an action is unused but
 // not listed (add the route, or list it with a reason).
 const PLANNED = {
-  "warehouse.read": "E3-01 warehouse API",
-  "warehouse.manage": "E3-01 warehouse API",
   "product.read": "E3-04 product API",
   "product.manage": "E3-04 product API",
   "member.manage": "E3-07 warehouse assignment",
