@@ -19,7 +19,7 @@ The numbers below are reserved from the start so that other documents can refer 
 | 0011 | Tenant data access helper, enforced by static tests and the cross-tenant harness         | accepted | E2-04 |
 | 0012 | Idempotency by a key row written in the same transaction as the business effect          | accepted | E4-01 |
 | 0013 | Warehouse row lock as the serialization point for stock writes                           | accepted | E4-02 |
-| 0014 | Transfer code without a shared row, and two-warehouse locking for transfers              | planned  | E5-03 |
+| 0014 | Transfer code without a shared row, and two-warehouse locking for transfers              | accepted | E5-03 |
 
 ## Format
 

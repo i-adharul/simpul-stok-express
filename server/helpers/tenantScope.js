@@ -3,9 +3,9 @@ const db = require("../models");
 
 // The only door to tenant data (docs/05, decision 2). Controllers and services never touch a model
 // directly: they call tenant(req.ctx).<Model>.<method>, and the organization filter is added here,
-// so forgetting it is not possible. Only these six methods exist on purpose: there is no destroy,
-// no bulkCreate and no raw query, so nothing can skip the filter. Add a method here, with a test,
-// when a story really needs it.
+// so forgetting it is not possible. Only these seven methods exist on purpose: there is no destroy
+// and no raw query, so nothing can skip the filter. Add a method here, with a test, when a story
+// really needs it (bulkCreate came with the transfer, which writes two movements per item at once).
 
 // AND, never a merge of keys: if the caller also filters on `organizationId` (by mistake or on
 // purpose), both conditions must hold, so the row of another organization can never match.
@@ -30,6 +30,9 @@ function scopeModel(Model, organizationId) {
 
     // The organization is written after the caller's values, so it always comes from the context.
     create: (values, options) => Model.create({ ...values, organizationId }, options),
+
+    // Every row gets the organization from the context, after its own values, like create.
+    bulkCreate: (rows, options) => Model.bulkCreate(rows.map((values) => ({ ...values, organizationId })), options),
 
     // `organizationId` is removed from the values so an update can never move a row to another
     // organization; the where is scoped, so a row of another organization is never touched.
