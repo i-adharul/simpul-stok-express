@@ -3,6 +3,7 @@ import BaseLayout from './layouts/BaseLayout'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
 import LoadingSkeleton from './components/LoadingSkeleton'
+import Login from './views/Login'
 import { toast } from './utils/toast'
 import { formatDateTime, formatNumber } from './utils/format'
 
@@ -32,6 +33,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="login" element={<Login />} />
         <Route element={<BaseLayout user={PLACEHOLDER_USER} />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<StatesPreview />} />
