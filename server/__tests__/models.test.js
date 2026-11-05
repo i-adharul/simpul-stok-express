@@ -11,12 +11,19 @@ describe("models/index.js", () => {
     expect(db.sequelize.config.database).not.toBe("simpul_dev");
   });
 
-  it("loads the four models", () => {
+  it("loads every model", () => {
     expect(
       Object.keys(db)
         .filter((key) => /^[A-Z]/.test(key) && key !== "Sequelize")
         .sort(),
-    ).toEqual(["Organization", "Plan", "Subscription", "User"]);
+    ).toEqual([
+      "Organization",
+      "Plan",
+      "Subscription",
+      "User",
+      "UserWarehouse",
+      "Warehouse",
+    ]);
   });
 
   it("links an organization to its users and to exactly one subscription", () => {
@@ -33,5 +40,23 @@ describe("models/index.js", () => {
     );
     expect(db.Subscription.associations.Plan.associationType).toBe("BelongsTo");
     expect(db.Plan.associations.Subscriptions.associationType).toBe("HasMany");
+  });
+
+  it("links a warehouse to its organization and its user assignments", () => {
+    expect(db.Organization.associations.Warehouses.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.Warehouse.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Warehouse.associations.UserWarehouses.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.UserWarehouse.associations.User.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.UserWarehouse.associations.Warehouse.associationType).toBe(
+      "BelongsTo",
+    );
   });
 });
