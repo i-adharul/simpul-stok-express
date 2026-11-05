@@ -76,6 +76,16 @@ const TENANT_ENDPOINTS = [
     body: () => ({ name: "Nama Baru" }),
     ...warehouse,
   },
+  // The assignment of a warehouse (E3-07): the row in the URL is the warehouse.
+  { method: "get", path: "/api/warehouses/:id/members", kind: "item", action: "member.manage", ...warehouse },
+  {
+    method: "put",
+    path: "/api/warehouses/:id/members",
+    kind: "item",
+    action: "member.manage",
+    body: () => ({ userIds: [] }),
+    ...warehouse,
+  },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
   {

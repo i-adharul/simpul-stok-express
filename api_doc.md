@@ -43,3 +43,10 @@ curl -X POST http://localhost:3000/api/products \
   -d '{"sku":"teh-botol-450","name":"Teh Botol 450 ml","unit":"btl","minStock":24}'
 # 201 {"id":"...","sku":"TEH-BOTOL-450","unit":"btl","minStock":24,...}
 ```
+
+## Warehouse assignment (`http/warehouses.http`)
+
+| Method and path | Who | What |
+| --- | --- | --- |
+| `GET /api/warehouses/:id/members` | Owner | `{ "candidates": [{ "id", "name", "email", "role", "assigned" }] }`: active Warehouse Admins and Viewers, sorted by name. `404` for a missing, malformed, foreign or archived warehouse. |
+| `PUT /api/warehouses/:id/members` | Owner | Body `{ "userIds": [...] }` (UUIDs, no duplicates, at most 200) replaces the whole assignment in one transaction; an empty list removes everyone. `200` has the shape of the `GET`. `400` for a wrong shape or a user who is inactive or not a Warehouse Admin or Viewer; `404` for a missing or foreign warehouse or user. |
