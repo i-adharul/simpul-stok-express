@@ -53,6 +53,15 @@ const TENANT_ENDPOINTS = [
     warehouseScoped: { request: async (world, warehouseId) => ({ id: warehouseId }) },
     ...warehouse,
   },
+  {
+    method: "post",
+    path: "/api/warehouses",
+    kind: "create",
+    action: "warehouse.manage",
+    // A new code every time: the same body twice would be a 409, not a valid request.
+    body: () => ({ code: `NEW-${Math.random().toString(36).slice(2, 10)}`, name: "Gudang Baru" }),
+    ...warehouse,
+  },
 ];
 
 const METHODS = ["get", "post", "put", "patch", "delete"];

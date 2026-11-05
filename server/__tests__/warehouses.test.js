@@ -205,3 +205,82 @@ describe("GET /api/warehouses/:id", () => {
     expect(admin.status).toBe(403);
   });
 });
+
+const send = (method, url, body, role = "OWNER") =>
+  request(app)[method](url).set("Authorization", as(role)).send(body);
+const warehouseRows = (organizationId) =>
+  sql(`SELECT * FROM "Warehouses" WHERE "organizationId" = :organizationId ORDER BY "code"`, { organizationId });
+
+describe("POST /api/warehouses", () => {
+  it("creates a warehouse in the caller's organization and answers 201 with it", async () => {
+    const res = await send("post", "/api/warehouses", { code: " gd-sudirman ", name: " Gudang Sudirman ", address: "Jl. Sudirman 1" });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      organizationId: orgA(),
+      code: "GD-SUDIRMAN",
+      name: "Gudang Sudirman",
+      address: "Jl. Sudirman 1",
+      archivedAt: null,
+    });
+    expect(res.body.id).toMatch(/^[0-9a-f-]{36}$/);
+    const rows = await warehouseRows(orgA());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ code: "GD-SUDIRMAN", name: "Gudang Sudirman" });
+  });
+
+  it("stores an empty address as null, and a missing address as null", async () => {
+    const empty = await send("post", "/api/warehouses", { code: "A", name: "A", address: "  " });
+    const missing = await send("post", "/api/warehouses", { code: "B", name: "B" });
+
+    expect(empty.body.address).toBeNull();
+    expect(missing.body.address).toBeNull();
+  });
+
+  it("answers 409 CONFLICT for a code that exists in the organization, whatever its letter case", async () => {
+    await send("post", "/api/warehouses", { code: "GD-1", name: "Satu" });
+
+    const res = await send("post", "/api/warehouses", { code: "gd-1 ", name: "Dua" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ code: "CONFLICT", message: "Kode gudang sudah dipakai.", details: null });
+    expect(await warehouseRows(orgA())).toHaveLength(1);
+  });
+
+  it("allows the same code in another organization", async () => {
+    await world.createWarehouse("B", "GD-1");
+
+    const res = await send("post", "/api/warehouses", { code: "GD-1", name: "Satu" });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("rejects an unknown field, organizationId included, and creates nothing", async () => {
+    const res = await send("post", "/api/warehouses", { code: "A", name: "A", organizationId: world.organizations.B });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ source: "body", path: "organizationId", message: "Field tidak dikenal." }]);
+    expect(await warehouseRows(world.organizations.B)).toHaveLength(0);
+    expect(await warehouseRows(orgA())).toHaveLength(0);
+  });
+
+  it.each([
+    [{ name: "A" }, "code"],
+    [{ code: "A".repeat(21), name: "A" }, "code"],
+    [{ code: "A" }, "name"],
+    [{ code: "A", name: "B".repeat(101) }, "name"],
+    [{ code: "A", name: "B", address: "x".repeat(256) }, "address"],
+  ])("answers 400 for %j", async (body, path) => {
+    const res = await send("post", "/api/warehouses", body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.details.map((d) => d.path)).toContain(path);
+  });
+
+  it.each(["WAREHOUSE_ADMIN", "VIEWER"])("answers 403 to a %s before the body is read", async (role) => {
+    const res = await send("post", "/api/warehouses", { nonsense: true }, role);
+
+    expect(res.status).toBe(403);
+    expect(await warehouseRows(orgA())).toHaveLength(0);
+  });
+});

@@ -1,5 +1,5 @@
-const { Op } = require("sequelize");
-const { forbidden, notFound } = require("../helpers/errors");
+const { Op, UniqueConstraintError } = require("sequelize");
+const { conflict, forbidden, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
 const { tenant } = require("../helpers/tenantScope");
@@ -73,4 +73,17 @@ async function show(req, res) {
   res.status(200).json({ ...toWarehouse(warehouse), assignedUsers });
 }
 
-module.exports = { list, show, toWarehouse };
+// The unique key (organizationId, code) is the single source of truth for "code exists": the
+// database decides, so two requests racing for one code cannot both succeed. No check-then-insert.
+function rethrowDuplicateCode(err) {
+  if (err instanceof UniqueConstraintError) throw conflict("Kode gudang sudah dipakai.");
+  throw err;
+}
+
+// organizationId is added by the tenant-scoped create from the context, never from the body.
+async function create(req, res) {
+  const row = await tenant(req.ctx).Warehouse.create(req.valid.body).catch(rethrowDuplicateCode);
+  res.status(201).json(toWarehouse(row));
+}
+
+module.exports = { list, show, create, toWarehouse };
