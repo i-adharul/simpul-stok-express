@@ -1,4 +1,5 @@
 const { validationError } = require("../helpers/errors");
+const { toDetails } = require("../helpers/validationDetails");
 
 // "header" (singular) is the name docs/04 gives to the source of header problems.
 const SOURCES = [
@@ -15,13 +16,6 @@ const strict = (schema) =>
   schema.def.type === "object" && schema.def.catchall === undefined
     ? schema.strict()
     : schema;
-
-const toDetails = (source, issues) =>
-  issues.map((issue) => ({
-    source,
-    path: issue.path.join("."),
-    message: issue.message,
-  }));
 
 // validate({ params, query, headers, body }) -> middleware. On success the parsed values (with
 // coercion and defaults applied) are in req.valid.<key>; controllers read them from there and
