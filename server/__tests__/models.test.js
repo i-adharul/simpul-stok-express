@@ -17,6 +17,7 @@ describe("models/index.js", () => {
         .filter((key) => /^[A-Z]/.test(key) && key !== "Sequelize")
         .sort(),
     ).toEqual([
+      "IdempotencyKey",
       "Organization",
       "Plan",
       "Product",
@@ -93,6 +94,12 @@ describe("models/index.js", () => {
       "HasMany",
     );
     expect(db.StockMovement.associations.StockTransfer.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links an idempotency key to its organization", () => {
+    expect(db.IdempotencyKey.associations.Organization.associationType).toBe(
       "BelongsTo",
     );
   });

@@ -2,6 +2,7 @@
 // beforeEach and afterAll: the files share one database, and a leftover row would break the
 // delete in another file. Add a table here when its migration is added.
 const TABLES_CHILD_FIRST = [
+  "IdempotencyKeys",
   "StockMovements",
   "StockTransfers",
   "StockLevels",
