@@ -126,6 +126,27 @@ const TENANT_ENDPOINTS = [
     },
     readRow: rawRow("Warehouses"),
   },
+  // The history (E4-07). It has no warehouseScoped: a warehouse out of reach is an empty list, not
+  // a 403, so the "unassigned warehouse is 403" check does not apply. A cursor holding B's id is
+  // not a cursor at all (400); it must never return a row of B.
+  {
+    method: "get",
+    path: "/api/stock/movements",
+    kind: "list",
+    action: "history.read",
+    supportsCursor: true,
+    createRow: async (world, organization) => {
+      const warehouseId = await world.createWarehouse(organization);
+      const productId = await world.createProduct(organization);
+      const [rows] = await getSequelize().query(
+        `INSERT INTO "StockMovements" ("organizationId", "warehouseId", "productId", "quantityDelta", "type")
+         VALUES (:organizationId, :warehouseId, :productId, 5, 'RECEIVE') RETURNING "id"`,
+        { replacements: { organizationId: world.organizations[organization], warehouseId, productId } },
+      );
+      return { id: rows[0].id };
+    },
+    readRow: rawRow("StockMovements"),
+  },
   // Stock receipt (E4-02). The row the endpoint creates is a movement; the warehouse is what a
   // foreign key must be tried on, so `createRow` makes a warehouse (the default for foreignBodies).
   {

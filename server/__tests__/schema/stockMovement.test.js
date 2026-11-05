@@ -213,6 +213,16 @@ describe("StockMovements table", () => {
     rows.forEach((row) => expect(row.indexdef).toMatch(/\("organizationId", /));
   });
 
+  it("has the history index (organizationId, createdAt DESC, id)", async () => {
+    const [rows] = await getSequelize().query(
+      `SELECT indexdef FROM pg_indexes
+       WHERE tablename = 'StockMovements' AND indexname = 'StockMovements_organizationId_createdAt_id_idx'`,
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].indexdef).toContain('("organizationId", "createdAt" DESC, id)');
+  });
+
   describe("append-only trigger", () => {
     beforeEach(() => insertMovement());
 

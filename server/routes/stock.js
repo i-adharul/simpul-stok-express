@@ -6,7 +6,7 @@ const idempotencyKey = require("../middlewares/idempotencyKey");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { receiveSchema, adjustSchema, stockListQuerySchema } = require("../schemas/stock.schema");
+const { receiveSchema, adjustSchema, stockListQuerySchema, movementListQuerySchema } = require("../schemas/stock.schema");
 
 const router = express.Router();
 
@@ -22,6 +22,15 @@ router.get(
   requireRole("stock.read"),
   validate({ query: stockListQuerySchema }),
   stockController.list,
+);
+
+// The history. A warehouse outside the caller's reach is an empty list here, not a 403 (docs/04).
+router.get(
+  "/stock/movements",
+  authentication,
+  requireRole("history.read"),
+  validate({ query: movementListQuerySchema }),
+  stockController.listMovements,
 );
 
 router.post(

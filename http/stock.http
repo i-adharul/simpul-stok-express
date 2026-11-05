@@ -53,3 +53,11 @@ Content-Type: application/json
 # 400 for a malformed id, an unknown status or paging out of range. 403 for a warehouseId the caller cannot reach (one body).
 GET {{baseUrl}}/api/stock?status=LOW&page=1&pageSize=20
 Authorization: Bearer {{token}}
+
+### Stock history (every tenant role; only the caller's warehouses)
+# Newest first, 50 rows a page. Query (all optional): productId, warehouseId (out of reach gives an empty list, not 403), type,
+# createdById, from (inclusive) and to (exclusive) as ISO 8601 instants WITH an offset, cursor (the nextCursor of the previous page).
+# Expect 200 { items: [{ id, warehouseId, productId, type, quantityDelta, reason, note, transferId, createdById, createdAt }], nextCursor }.
+# 400 for a malformed id, an unknown type, a bad instant or a cursor that is not a nextCursor.
+GET {{baseUrl}}/api/stock/movements?type=RECEIVE&from=2026-11-01T00:00:00%2B07:00
+Authorization: Bearer {{token}}

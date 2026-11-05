@@ -16,7 +16,6 @@ const { TENANT_ENDPOINTS } = require("./support/registry");
 const PLANNED = {
   "subscription.manage": "billing endpoints (M2, E8)",
   "transfer.destinations": "E5-06 transfer destinations endpoint",
-  "history.read": "E4-07 GET /api/stock/movements",
   "stock.transfer": "E5-04 POST /api/stock/transfers",
 };
 

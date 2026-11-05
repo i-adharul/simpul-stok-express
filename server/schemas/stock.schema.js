@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { decodeCursor } = require("../helpers/cursor");
 const { listQuerySchema } = require("./pagination.schema");
 
 // IDs are lowercased first so "ABC..." and "abc..." are the same warehouse and product.
@@ -60,4 +61,26 @@ const stockListQuerySchema = listQuerySchema.pick({ page: true, pageSize: true }
   status: z.enum(["OUT", "LOW", "OK"]).optional(),
 });
 
-module.exports = { receiveSchema, adjustSchema, stockListQuerySchema, REASONS };
+// An ISO 8601 instant WITH an offset ("2026-11-05T00:00:00+07:00" or "...Z"), read as a Date.
+const instant = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
+
+// GET /api/stock/movements (BL16). No page or pageSize: the history uses a cursor and a fixed page of 50.
+// The cursor is decoded here; anything that is not a `nextCursor` of an earlier answer is a 400.
+const movementListQuerySchema = z.object({
+  productId: id.optional(),
+  warehouseId: id.optional(),
+  type: z.enum(["RECEIVE", "ADJUST", "TRANSFER_OUT", "TRANSFER_IN", "IMPORT"]).optional(),
+  createdById: id.optional(),
+  from: instant.optional(),
+  to: instant.optional(),
+  cursor: z
+    .string()
+    .transform((value, ctx) => {
+      const position = decodeCursor(value);
+      if (!position) ctx.addIssue({ code: "custom", message: "Cursor tidak valid." });
+      return position;
+    })
+    .optional(),
+});
+
+module.exports = { receiveSchema, adjustSchema, stockListQuerySchema, movementListQuerySchema, REASONS };
