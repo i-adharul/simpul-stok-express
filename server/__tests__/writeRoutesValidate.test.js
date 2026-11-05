@@ -5,10 +5,13 @@ const validate = require("../middlewares/validate");
 const { listRoutes, findUnvalidatedWriteRoutes } = require("./support/routeInspector");
 
 // Write routes that are allowed to skip `validate`, with the reason. Keep this list short.
-// The label is "<METHOD> <path as declared in the router>". It is empty today.
+// The label is "<METHOD> <path as declared in the router>".
 //   Example (added later, with its reason): "POST /webhooks/xendit" - the body is checked by
 //   verifying the signature of the raw bytes, not by a Zod schema.
-const ALLOWED_WITHOUT_VALIDATE = [];
+const ALLOWED_WITHOUT_VALIDATE = [
+  // Logout reads no input and always answers 204, so there is nothing to validate (docs/04).
+  "POST /auth/logout",
+];
 
 describe("rule 4: every write route validates its input", () => {
   it("finds the routes of the real app (the inspector is not blind)", () => {
