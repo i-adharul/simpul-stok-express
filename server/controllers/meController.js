@@ -1,3 +1,5 @@
+const authService = require("../services/authService");
+
 // req.user comes from the authentication middleware and already holds the organization (loaded in
 // the same query). Only the documented fields are copied, so nothing else can leak by accident.
 function getMe(req, res) {
@@ -15,4 +17,11 @@ function getMe(req, res) {
   });
 }
 
-module.exports = { getMe };
+// The user comes from the token (req.user), never from the body. The service answers with a new
+// token: the one used for this request stops working as soon as the password changes.
+async function changePassword(req, res) {
+  const result = await authService.changePassword(req.user.id, req.valid.body);
+  res.status(200).json(result);
+}
+
+module.exports = { getMe, changePassword };

@@ -110,3 +110,93 @@ describe("authService.login: every failure is the same 401", () => {
     expect((await readUser(user.id)).lastLoginAt).toBeNull();
   });
 });
+
+describe("authService.changePassword", () => {
+  const { changePassword } = require("../services/authService");
+  const { comparePassword } = require("../helpers/bcrypt");
+  const { verifyToken } = require("../helpers/jwt");
+
+  const NEW = "Kopi-Susu-2027";
+
+  it("stores a new hash, sets passwordChangedAt and returns a token for the same user", async () => {
+    const user = await createAccount();
+    const before = await readUser(user.id);
+
+    const result = await changePassword(user.id, { currentPassword: user.password, newPassword: NEW });
+
+    const after = await readUser(user.id);
+    expect(after.passwordHash).not.toBe(before.passwordHash);
+    await expect(comparePassword(NEW, after.passwordHash)).resolves.toBe(true);
+    await expect(comparePassword(user.password, after.passwordHash)).resolves.toBe(false);
+    expect(after.passwordChangedAt).toBeInstanceOf(Date);
+    expect(verifyToken(result.token).sub).toBe(user.id);
+    expect(Object.keys(result)).toEqual(["token"]);
+  });
+
+  it("the returned token was issued at or after passwordChangedAt", async () => {
+    const user = await createAccount();
+
+    const { token } = await changePassword(user.id, { currentPassword: user.password, newPassword: NEW });
+
+    const { passwordChangedAt } = await readUser(user.id);
+    expect(verifyToken(token).iat).toBeGreaterThanOrEqual(Math.floor(passwordChangedAt.getTime() / 1000));
+  });
+
+  it("a wrong current password throws INVALID_CURRENT_PASSWORD and changes nothing", async () => {
+    const user = await createAccount();
+    const before = await readUser(user.id);
+
+    const error = await changePassword(user.id, { currentPassword: "Salah-Banget-1", newPassword: NEW }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.code).toBe("INVALID_CURRENT_PASSWORD");
+    expect(error.status).toBe(400);
+    expect(error.message).toBe("Password saat ini salah.");
+    const after = await readUser(user.id);
+    expect(after.passwordHash).toBe(before.passwordHash);
+    expect(after.passwordChangedAt).toBeNull();
+  });
+
+  it("checks the current password before the rules: a weak new password with a wrong current one is INVALID_CURRENT_PASSWORD", async () => {
+    const user = await createAccount();
+
+    const error = await changePassword(user.id, { currentPassword: "Salah-Banget-1", newPassword: "123" }).catch((e) => e);
+
+    expect(error.code).toBe("INVALID_CURRENT_PASSWORD");
+  });
+
+  it.each([
+    ["too short", "abc1", "Password harus minimal 8 karakter dan mengandung huruf serta angka."],
+    ["no digit", "abcdefghij", "Password harus minimal 8 karakter dan mengandung huruf serta angka."],
+    ["common", "Password123", "Password terlalu umum."],
+    ["over 72 bytes", `${"a".repeat(72)}1`, "Password maksimal 72 karakter."],
+  ])("a refused new password (%s) throws VALIDATION_ERROR with the reason", async (_name, newPassword, message) => {
+    const user = await createAccount({ email: "owner@example.com" });
+    const before = await readUser(user.id);
+
+    const error = await changePassword(user.id, { currentPassword: user.password, newPassword }).catch((e) => e);
+
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.status).toBe(400);
+    expect(error.message).toBe(message);
+    expect(error.details).toEqual([{ source: "body", path: "newPassword", message }]);
+    expect((await readUser(user.id)).passwordHash).toBe(before.passwordHash);
+  });
+
+  it("refuses a new password equal to the part before the @ of the email", async () => {
+    const user = await createAccount({ email: "budi12345@example.com" });
+
+    const error = await changePassword(user.id, { currentPassword: user.password, newPassword: "budi12345" }).catch((e) => e);
+
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.message).toBe("Password tidak boleh sama dengan email.");
+  });
+
+  it("a current password over 72 bytes is just a wrong current password", async () => {
+    const user = await createAccount();
+
+    const error = await changePassword(user.id, { currentPassword: `${user.password}${"x".repeat(80)}`, newPassword: NEW }).catch((e) => e);
+
+    expect(error.code).toBe("INVALID_CURRENT_PASSWORD");
+  });
+});
