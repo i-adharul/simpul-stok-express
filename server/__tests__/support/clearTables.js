@@ -2,6 +2,8 @@
 // beforeEach and afterAll: the files share one database, and a leftover row would break the
 // delete in another file. Add a table here when its migration is added.
 const TABLES_CHILD_FIRST = [
+  "Notifications",
+  "AuditLogs",
   "WebhookEvents",
   "Invoices",
   "Invitations",
@@ -17,7 +19,7 @@ const TABLES_CHILD_FIRST = [
 const EARLIER_TABLES = ["Subscriptions", "Users", "Organizations", "Plans"];
 
 // A trigger refuses DELETE on these tables (ADR 0005), so they are emptied with TRUNCATE.
-const APPEND_ONLY_TABLES = ["StockMovements"];
+const APPEND_ONLY_TABLES = ["StockMovements", "AuditLogs"];
 
 async function clearTables(sequelize) {
   for (const table of [...TABLES_CHILD_FIRST, ...EARLIER_TABLES]) {

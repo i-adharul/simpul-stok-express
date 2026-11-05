@@ -17,10 +17,12 @@ describe("models/index.js", () => {
         .filter((key) => /^[A-Z]/.test(key) && key !== "Sequelize")
         .sort(),
     ).toEqual([
+      "AuditLog",
       "IdempotencyKey",
       "ImportJob",
       "Invitation",
       "Invoice",
+      "Notification",
       "Organization",
       "Plan",
       "Product",
@@ -135,5 +137,13 @@ describe("models/index.js", () => {
     );
     expect(db.Invoice.associations.Plan.associationType).toBe("BelongsTo");
     expect(Object.keys(db.WebhookEvent.associations)).toEqual([]);
+  });
+
+  it("links an audit log to its organization and actor, and a notification to its recipient", () => {
+    expect(db.AuditLog.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.AuditLog.associations.actor.associationType).toBe("BelongsTo");
+    expect(db.Notification.associations.User.associationType).toBe("BelongsTo");
   });
 });
