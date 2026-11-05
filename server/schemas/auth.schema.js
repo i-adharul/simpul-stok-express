@@ -8,4 +8,11 @@ const loginSchema = z.object({
   password: z.string().min(1).max(128),
 });
 
-module.exports = { loginSchema };
+// Only the shape: the password rules (helpers/password.js) apply to newPassword after the current
+// password is verified, so their reason can be the 400 message (docs/04). Neither field is trimmed.
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(1).max(128),
+});
+
+module.exports = { loginSchema, changePasswordSchema };
