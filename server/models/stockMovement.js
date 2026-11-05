@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
       StockMovement.belongsTo(models.StockTransfer, {
         foreignKey: "transferId",
       });
+      StockMovement.belongsTo(models.ImportJob, { foreignKey: "importJobId" });
       StockMovement.belongsTo(models.User, {
         foreignKey: "createdById",
         as: "createdBy",

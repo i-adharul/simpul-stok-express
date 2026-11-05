@@ -6,6 +6,7 @@ let organizationId;
 let warehouseId;
 let productId;
 let transferId;
+let createdById;
 
 const insertReturningId = async (sql, replacements) => {
   const [rows] = await getSequelize().query(`${sql} RETURNING "id"`, {
@@ -52,6 +53,11 @@ describe("StockMovements table", () => {
     );
     productId = await insertReturningId(
       `INSERT INTO "Products" ("organizationId", "sku", "name", "unit") VALUES (:organizationId, 'IDM', 'Indomie', 'bks')`,
+      { organizationId },
+    );
+    createdById = await insertReturningId(
+      `INSERT INTO "Users" ("organizationId", "email", "name", "passwordHash", "role")
+       VALUES (:organizationId, 'budi@example.com', 'Budi', 'hash', 'OWNER')`,
       { organizationId },
     );
     transferId = await insertReturningId(
@@ -144,6 +150,38 @@ describe("StockMovements table", () => {
     expect(await constraintOf(insertMovement({ importJobId }))).toBe(
       "StockMovements_importJobId_check",
     );
+  });
+
+  it("accepts an IMPORT movement that points to an import job", async () => {
+    const importJobId = await insertReturningId(
+      `INSERT INTO "ImportJobs" ("organizationId", "fileName", "totalRows", "errorRows", "createdById")
+       VALUES (:organizationId, 'stok.csv', 1, 0, :createdById)`,
+      { organizationId, createdById },
+    );
+    await insertMovement({ type: "IMPORT", importJobId });
+  });
+
+  it("refuses an import job that does not exist", async () => {
+    expect(
+      await constraintOf(
+        insertMovement({
+          type: "IMPORT",
+          importJobId: "00000000-0000-4000-8000-000000000000",
+        }),
+      ),
+    ).toBe("StockMovements_importJobId_fkey");
+  });
+
+  it("refuses to delete an import job that has movements", async () => {
+    const importJobId = await insertReturningId(
+      `INSERT INTO "ImportJobs" ("organizationId", "fileName", "totalRows", "errorRows", "createdById")
+       VALUES (:organizationId, 'stok.csv', 1, 0, :createdById)`,
+      { organizationId, createdById },
+    );
+    await insertMovement({ type: "IMPORT", importJobId });
+    expect(
+      await constraintOf(getSequelize().query('DELETE FROM "ImportJobs"')),
+    ).toBe("StockMovements_importJobId_fkey");
   });
 
   it("refuses a transfer, warehouse or product that does not exist", async () => {

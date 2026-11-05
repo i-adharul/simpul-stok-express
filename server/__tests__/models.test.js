@@ -18,6 +18,8 @@ describe("models/index.js", () => {
         .sort(),
     ).toEqual([
       "IdempotencyKey",
+      "ImportJob",
+      "Invitation",
       "Organization",
       "Plan",
       "Product",
@@ -100,6 +102,24 @@ describe("models/index.js", () => {
 
   it("links an idempotency key to its organization", () => {
     expect(db.IdempotencyKey.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links an invitation and an import job to their organization and creator", () => {
+    expect(db.Invitation.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Invitation.associations.createdBy.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.ImportJob.associations.createdBy.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.ImportJob.associations.StockMovements.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.StockMovement.associations.ImportJob.associationType).toBe(
       "BelongsTo",
     );
   });
