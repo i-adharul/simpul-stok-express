@@ -76,6 +76,21 @@ const stockBody = async (world, patch = {}) => ({
   ...patch,
 });
 
+// A valid transfer body: a source holding 5 units of a product, and an empty destination. A patch
+// replaces the source, the destination or the product (the foreign-key variants, and a Warehouse
+// Admin's assigned source). Stock is put in the source that is used; for a random or foreign
+// source the insert may fail or be pointless, and the request is refused anyway, so it is ignored.
+async function transferBody(world, { fromWarehouseId, toWarehouseId, productId } = {}) {
+  const from = fromWarehouseId ?? (await world.createWarehouse("A"));
+  const product = await world.createProduct("A");
+  await createStockLevel(world.organizations.A, from, product, 5).catch(() => {});
+  return {
+    fromWarehouseId: from,
+    toWarehouseId: toWarehouseId ?? (await world.createWarehouse("A")),
+    items: [{ productId: productId ?? product, quantity: 1 }],
+  };
+}
+
 // Added by the story that adds the route (rule 16): warehouses in E3-01, products in E3-04.
 const TENANT_ENDPOINTS = [
   { method: "get", path: "/api/warehouses", kind: "list", action: "warehouse.read", listQuery: { pageSize: 100 }, ...warehouse },
@@ -207,6 +222,32 @@ const TENANT_ENDPOINTS = [
     createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
     readRow: rawRow("StockMovements"),
     countRows: rawCount("StockMovements"),
+  },
+  // Stock transfer (E5-04). The body needs two warehouses, a product and stock in the source; the
+  // role is judged against the SOURCE warehouse, so a Warehouse Admin's request uses the warehouse
+  // that was assigned. The rows the endpoint creates are transfers (countRows), and the warehouse
+  // is what a foreign key is tried on. A foreign source is answered like a random one (403), a
+  // foreign destination or product like a random one (404).
+  {
+    method: "post",
+    path: "/api/stock/transfers",
+    kind: "create",
+    action: "stock.transfer",
+    idempotent: true,
+    body: (world) => transferBody(world),
+    foreignBodies: [
+      { key: "fromWarehouseId", body: (world, id) => transferBody(world, { fromWarehouseId: id }) },
+      { key: "toWarehouseId", body: (world, id) => transferBody(world, { toWarehouseId: id }) },
+      {
+        key: "productId",
+        createForeign: async (world) => ({ id: await world.createProduct("B") }),
+        body: (world, id) => transferBody(world, { productId: id }),
+      },
+    ],
+    warehouseScoped: { request: async (world, warehouseId) => ({ body: await transferBody(world, { fromWarehouseId: warehouseId }) }) },
+    createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
+    readRow: rawRow("StockTransfers"),
+    countRows: rawCount("StockTransfers"),
   },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", listQuery: { pageSize: 100 }, ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
