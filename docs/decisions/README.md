@@ -14,7 +14,7 @@ The numbers below are reserved from the start so that other documents can refer 
 | 0006 | Tenant integrity enforced by the application, not composite foreign keys                 | accepted | E0-05 |
 | 0007 | Supabase connection strategy (direct or session mode for migrations and locks)           | planned  | E6-04 |
 | 0008 | Deployment layout on EC2 (pm2, Nginx, HTTPS) and the client on Vercel                    | planned  | E6-04 |
-| 0009 | A stateless signed JWT (no session table)                                                | planned  | E1-02 |
+| 0009 | A stateless signed JWT (no session table)                                                | accepted | E1-02 |
 | 0010 | Bearer token instead of a cookie: no CSRF check, and the XSS trade-off                   | planned  | E1-06 |
 | 0011 | Tenant data access helper, enforced by static tests and the cross-tenant harness         | planned  | E2-04 |
 | 0012 | Idempotency by a key row written in the same transaction as the business effect          | planned  | E4-01 |
