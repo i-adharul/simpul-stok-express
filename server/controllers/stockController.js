@@ -84,4 +84,9 @@ async function listMovements(req, res) {
   res.status(200).json(await stockHistoryService.listMovements(req.ctx, req.valid.query));
 }
 
-module.exports = { receive, adjust, list, listMovements };
+// No input schema: the only input is the ID, and a malformed ID must be 404, not 400 (rule 2).
+async function showMovement(req, res) {
+  res.status(200).json(await stockHistoryService.getMovement(req.ctx, req.params.id));
+}
+
+module.exports = { receive, adjust, list, listMovements, showMovement };

@@ -61,3 +61,11 @@ Authorization: Bearer {{token}}
 # 400 for a malformed id, an unknown type, a bad instant or a cursor that is not a nextCursor.
 GET {{baseUrl}}/api/stock/movements?type=RECEIVE&from=2026-11-01T00:00:00%2B07:00
 Authorization: Bearer {{token}}
+
+### One movement (every tenant role; the movement's warehouse must be one of the caller's)
+# Expect 200: the list item plus warehouse { id, code, name }, product { id, sku, name, unit }, createdBy { id, name, role } | null
+# and transfer { id, code, fromWarehouse { id, name }, toWarehouse { id, name } } | null. No email.
+# 404 NOT_FOUND (one body) for a malformed, missing, foreign or out-of-reach id.
+@movementId = paste-a-movement-id-here
+GET {{baseUrl}}/api/stock/movements/{{movementId}}
+Authorization: Bearer {{token}}
