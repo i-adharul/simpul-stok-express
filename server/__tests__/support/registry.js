@@ -15,6 +15,8 @@
 //                 it may create the rows the body points at (a stock write needs a warehouse and a product)
 //   countRows     async (organizationId) => how many rows the endpoint's table holds for it
 //                 (needed for "create" entries and for idempotent ones)
+//   listQuery     optional query for the list check, e.g. { pageSize: 100 }: the world is shared by all
+//                 entries, and stock bodies add many rows, so A's own row must still fit on the page
 //   supportsCursor  optional true: a list that takes a cursor; `cursorParam` names it (default "cursor")
 //   idempotent    optional true: the endpoint needs an Idempotency-Key
 //   foreignBodies optional [{ key, body: async (world, id) => a body whose `key` holds `id`,
@@ -60,7 +62,7 @@ const stockBody = async (world, patch = {}) => ({
 
 // Added by the story that adds the route (rule 16): warehouses in E3-01, products in E3-04.
 const TENANT_ENDPOINTS = [
-  { method: "get", path: "/api/warehouses", kind: "list", action: "warehouse.read", ...warehouse },
+  { method: "get", path: "/api/warehouses", kind: "list", action: "warehouse.read", listQuery: { pageSize: 100 }, ...warehouse },
   {
     method: "get",
     path: "/api/warehouses/:id",
@@ -131,7 +133,34 @@ const TENANT_ENDPOINTS = [
     readRow: rawRow("StockMovements"),
     countRows: rawCount("StockMovements"),
   },
-  { method: "get", path: "/api/products", kind: "list", action: "product.read", ...product },
+  // Stock adjustment (E4-04): the same shape as the receipt. SET to a different quantity each
+  // time would be needed for a repeated body, but a replay never runs it again, and each body
+  // makes its own warehouse and product (no stock row yet, so SET 5 is a change from 0).
+  {
+    method: "post",
+    path: "/api/stock/adjust",
+    kind: "create",
+    action: "stock.adjust",
+    idempotent: true,
+    body: (world) => stockBody(world, { quantity: undefined, mode: "SET", value: 5, reason: "STOCK_OPNAME" }),
+    foreignBodies: [
+      { key: "warehouseId", body: (world, id) => stockBody(world, { quantity: undefined, mode: "SET", value: 5, reason: "STOCK_OPNAME", warehouseId: id }) },
+      {
+        key: "productId",
+        createForeign: async (world) => ({ id: await world.createProduct("B") }),
+        body: (world, id) => stockBody(world, { quantity: undefined, mode: "SET", value: 5, reason: "STOCK_OPNAME", productId: id }),
+      },
+    ],
+    warehouseScoped: {
+      request: async (world, warehouseId) => ({
+        body: await stockBody(world, { quantity: undefined, mode: "SET", value: 5, reason: "STOCK_OPNAME", warehouseId }),
+      }),
+    },
+    createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
+    readRow: rawRow("StockMovements"),
+    countRows: rawCount("StockMovements"),
+  },
+  { method: "get", path: "/api/products", kind: "list", action: "product.read", listQuery: { pageSize: 100 }, ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
   {
     method: "post",
