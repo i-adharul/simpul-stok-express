@@ -20,6 +20,7 @@ describe("models/index.js", () => {
       "IdempotencyKey",
       "ImportJob",
       "Invitation",
+      "Invoice",
       "Organization",
       "Plan",
       "Product",
@@ -30,6 +31,7 @@ describe("models/index.js", () => {
       "User",
       "UserWarehouse",
       "Warehouse",
+      "WebhookEvent",
     ]);
   });
 
@@ -122,5 +124,16 @@ describe("models/index.js", () => {
     expect(db.StockMovement.associations.ImportJob.associationType).toBe(
       "BelongsTo",
     );
+  });
+
+  it("links an invoice to its organization, subscription and plan; a webhook event stands alone", () => {
+    expect(db.Invoice.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Invoice.associations.Subscription.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Invoice.associations.Plan.associationType).toBe("BelongsTo");
+    expect(Object.keys(db.WebhookEvent.associations)).toEqual([]);
   });
 });

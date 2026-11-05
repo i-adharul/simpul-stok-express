@@ -26,4 +26,24 @@ const createUser = (
     { organizationId, email, role },
   );
 
-module.exports = { insertReturningId, createOrganization, createUser };
+const createPlan = (name = "Starter") =>
+  insertReturningId(
+    `INSERT INTO "Plans" ("name", "priceIdr", "maxWarehouses", "maxProducts", "maxMembers")
+     VALUES (:name, 300000, 2, 100, 3)`,
+    { name },
+  );
+
+const createSubscription = (organizationId, planId) =>
+  insertReturningId(
+    `INSERT INTO "Subscriptions" ("organizationId", "planId", "currentPeriodStart", "currentPeriodEnd", "graceUntil")
+     VALUES (:organizationId, :planId, '2026-11-01T00:00:00Z', '2026-12-01T00:00:00Z', '2026-12-04T00:00:00Z')`,
+    { organizationId, planId },
+  );
+
+module.exports = {
+  insertReturningId,
+  createOrganization,
+  createUser,
+  createPlan,
+  createSubscription,
+};
