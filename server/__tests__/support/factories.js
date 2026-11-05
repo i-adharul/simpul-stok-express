@@ -61,6 +61,13 @@ const createProduct = (organizationId, sku = "SKU-1", unit = "pcs") =>
     { organizationId, sku, unit },
   );
 
+const createStockLevel = (organizationId, warehouseId, productId, quantity) =>
+  insertReturningId(
+    `INSERT INTO "StockLevels" ("organizationId", "warehouseId", "productId", "quantity")
+     VALUES (:organizationId, :warehouseId, :productId, :quantity)`,
+    { organizationId, warehouseId, productId, quantity },
+  );
+
 // The world of the cross-tenant harness: two organizations (A is the caller, B is the "other
 // tenant"), one user per role in each, ready-to-use tokens, and builders that make rows for either
 // organization. Rows are raw SQL like the other factories, so the harness does not depend on the
@@ -119,4 +126,5 @@ module.exports = {
   assignWarehouse,
   createPlan,
   createSubscription,
+  createStockLevel,
 };

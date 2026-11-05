@@ -15,7 +15,7 @@ read; an ID that is missing, malformed or belongs to another organization gets `
 | `GET /api/warehouses` | every tenant role | Paged list. Query `page` (default 1), `pageSize` (default 20, at most 100), `includeArchived` (`true` or `false`, Owner only). Owner: all active warehouses; Warehouse Admin and Viewer: the assigned ones. Ordered by `code`, then `id`. |
 | `GET /api/warehouses/:id` | every tenant role | The warehouse plus `assignedUsers` (`id`, `name`, `role`; no email). `403` for a Warehouse Admin or Viewer who is not assigned; an archived warehouse is visible to the Owner only. |
 | `POST /api/warehouses` | Owner | Body `code` (1 to 20 characters, stored uppercase, unique per organization), `name` (1 to 100), optional `address` (at most 255, empty is stored as null). `409` "Kode gudang sudah dipakai." when the code exists. |
-| `PATCH /api/warehouses/:id` | Owner | Body with at least one of `code`, `name`, `address` (same rules as `POST`). `archived` arrives with the archive story. |
+| `PATCH /api/warehouses/:id` | Owner | Body with at least one of `code`, `name`, `address` (same rules as `POST`) and `archived` (`true` archives, `false` restores). Archiving is refused with `409` "Gudang masih memiliki stok. Kosongkan stok sebelum mengarsipkan." while any stock row is above 0. An archived warehouse is found only when restoring; otherwise `404`. |
 
 Example:
 

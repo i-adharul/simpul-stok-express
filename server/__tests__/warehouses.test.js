@@ -354,7 +354,7 @@ describe("PATCH /api/warehouses/:id", () => {
   it.each([
     [{}, "an empty body"],
     [{ organizationId: "x" }, "organizationId"],
-    [{ archived: true }, "archived (delivered in E3-03)"],
+    [{ archived: "yes" }, "archived that is not a boolean"],
     [{ name: "" }, "an empty name"],
     [{ code: "A".repeat(21) }, "a code that is too long"],
     [{ address: "x".repeat(256) }, "an address that is too long"],
@@ -375,7 +375,7 @@ describe("PATCH /api/warehouses/:id", () => {
     expect((await readWarehouse(id)).organizationId).toBe(orgA());
   });
 
-  it("answers 404 for an archived warehouse (it can only be restored, delivered in E3-03)", async () => {
+  it("answers 404 for an archived warehouse unless it is being restored", async () => {
     const id = await archivedWarehouse("GD-OLD");
 
     expect((await send("patch", `/api/warehouses/${id}`, { name: "X" })).status).toBe(404);
@@ -388,5 +388,123 @@ describe("PATCH /api/warehouses/:id", () => {
     expect((await send("patch", `/api/warehouses/${own}`, { name: "X" }, role)).status).toBe(403);
     expect((await send("patch", `/api/warehouses/${foreign}`, { name: "X" }, role)).status).toBe(403);
     expect((await readWarehouse(own)).name).not.toBe("X");
+  });
+});
+
+describe("PATCH /api/warehouses/:id with archived (BL08)", () => {
+  const { createStockLevel } = require("./support/factories");
+  const readWarehouse = async (id) => (await sql(`SELECT * FROM "Warehouses" WHERE "id" = :id`, { id }))[0];
+  const codes = async (query = "") => (await get(`/api/warehouses${query}`)).body.items.map((w) => w.code);
+
+  it("archives a warehouse whose stock rows are all 0 (or that has none)", async () => {
+    const empty = await world.createWarehouse("A", "GD-EMPTY");
+    const zero = await world.createWarehouse("A", "GD-ZERO");
+    await createStockLevel(orgA(), zero, await world.createProduct("A"), 0);
+
+    for (const id of [empty, zero]) {
+      const res = await send("patch", `/api/warehouses/${id}`, { archived: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.archivedAt).not.toBeNull();
+      expect((await readWarehouse(id)).archivedAt).not.toBeNull();
+    }
+    expect(await codes()).toEqual([]);
+    expect(await codes("?includeArchived=true")).toEqual(["GD-EMPTY", "GD-ZERO"]);
+  });
+
+  it("refuses to archive while any stock row is above 0 (409) and changes nothing", async () => {
+    const id = await world.createWarehouse("A", "GD-1");
+    await createStockLevel(orgA(), id, await world.createProduct("A"), 0);
+    await createStockLevel(orgA(), id, await world.createProduct("A"), 3);
+
+    const res = await send("patch", `/api/warehouses/${id}`, { archived: true, name: "Dicoba" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      code: "CONFLICT",
+      message: "Gudang masih memiliki stok. Kosongkan stok sebelum mengarsipkan.",
+      details: null,
+    });
+    expect(await readWarehouse(id)).toMatchObject({ archivedAt: null });
+    expect((await readWarehouse(id)).name).not.toBe("Dicoba");
+  });
+
+  it("looks only at the stock of this warehouse", async () => {
+    const id = await world.createWarehouse("A", "GD-1");
+    const other = await world.createWarehouse("A", "GD-2");
+    await createStockLevel(orgA(), other, await world.createProduct("A"), 50);
+
+    expect((await send("patch", `/api/warehouses/${id}`, { archived: true })).status).toBe(200);
+  });
+
+  it("restores an archived warehouse with archived: false", async () => {
+    const id = await archivedWarehouse("GD-OLD");
+
+    const res = await send("patch", `/api/warehouses/${id}`, { archived: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archivedAt).toBeNull();
+    expect((await readWarehouse(id)).archivedAt).toBeNull();
+    expect(await codes()).toEqual(["GD-OLD"]);
+  });
+
+  it("restores and edits in one request", async () => {
+    const id = await archivedWarehouse("GD-OLD");
+
+    const res = await send("patch", `/api/warehouses/${id}`, { archived: false, name: "Hidup Lagi" });
+
+    expect(res.body).toMatchObject({ name: "Hidup Lagi", archivedAt: null });
+  });
+
+  it("finds an archived warehouse only when restoring: any other change is 404", async () => {
+    const id = await archivedWarehouse("GD-OLD");
+
+    expect((await send("patch", `/api/warehouses/${id}`, { name: "X" })).status).toBe(404);
+    expect((await send("patch", `/api/warehouses/${id}`, { archived: true })).status).toBe(404);
+    expect((await readWarehouse(id)).archivedAt).not.toBeNull();
+  });
+
+  it("treats archived: false on an active warehouse as no change (200)", async () => {
+    const id = await world.createWarehouse("A");
+
+    const res = await send("patch", `/api/warehouses/${id}`, { archived: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archivedAt).toBeNull();
+  });
+
+  it("rejects a non-boolean archived (400)", async () => {
+    const id = await world.createWarehouse("A");
+
+    for (const archived of ["true", 1, null]) {
+      expect((await send("patch", `/api/warehouses/${id}`, { archived })).status).toBe(400);
+    }
+  });
+
+  it("answers 404 for another organization's warehouse, also when restoring", async () => {
+    const foreign = await archivedWarehouse("GD-B", world.organizations.B);
+
+    const res = await send("patch", `/api/warehouses/${foreign}`, { archived: false });
+
+    expect(res.status).toBe(404);
+    expect((await readWarehouse(foreign)).archivedAt).not.toBeNull();
+  });
+
+  it.each(["WAREHOUSE_ADMIN", "VIEWER"])("answers 403 to a %s", async (role) => {
+    const id = await world.createWarehouse("A");
+
+    expect((await send("patch", `/api/warehouses/${id}`, { archived: true }, role)).status).toBe(403);
+    expect((await readWarehouse(id)).archivedAt).toBeNull();
+  });
+
+  it("removes the archived warehouse from the context of an assigned Warehouse Admin", async () => {
+    const id = await world.createWarehouse("A");
+    await assignWarehouse(orgA(), world.users.A.WAREHOUSE_ADMIN.id, id);
+    expect((await get("/api/warehouses", "WAREHOUSE_ADMIN")).body.total).toBe(1);
+
+    await send("patch", `/api/warehouses/${id}`, { archived: true });
+
+    expect((await get("/api/warehouses", "WAREHOUSE_ADMIN")).body.total).toBe(0);
+    expect((await get(`/api/warehouses/${id}`, "WAREHOUSE_ADMIN")).status).toBe(404);
   });
 });
