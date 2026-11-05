@@ -11,7 +11,7 @@ const { assignWarehouse } = require("./factories");
 // the caller's own row for an item, a valid body for a write.
 async function ownRequest(entry, world, role) {
   const id = entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined;
-  return { id, authorization: world.users.A[role].authorization, body: validBody(entry, world) };
+  return { id, authorization: world.users.A[role].authorization, body: await validBody(entry, world) };
 }
 
 // Every role gets the answer the matrix gives:
@@ -40,7 +40,7 @@ async function checkRoleMatrix(app, entry, world) {
   const admin = await send(app, entry, {
     id: entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined,
     authorization: world.platformAdmin.authorization,
-    body: validBody(entry, world),
+    body: await validBody(entry, world),
   });
   failures.push(...expectStatus(entry, "Platform admin", admin, 403));
   return failures;

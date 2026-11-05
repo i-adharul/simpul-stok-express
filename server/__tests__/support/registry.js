@@ -11,12 +11,13 @@
 //   action        an action of helpers/permissions.js; the roles that may call it come from there
 //   createRow     async (world, "A" | "B") => { id, ... }: makes a row in that organization
 //   readRow       async (id) => the row as it is in the database, or null (raw SQL)
-//   body          optional (world) => a valid body for a write (also the base of foreignBodies)
+//   body          optional async (world) => a valid body for a write (also the base of foreignBodies);
+//                 it may create the rows the body points at (a stock write needs a warehouse and a product)
 //   countRows     async (organizationId) => how many rows the endpoint's table holds for it
 //                 (needed for "create" entries and for idempotent ones)
 //   supportsCursor  optional true: a list that takes a cursor; `cursorParam` names it (default "cursor")
 //   idempotent    optional true: the endpoint needs an Idempotency-Key
-//   foreignBodies optional [{ key, body: (world, id) => a body whose `key` holds `id`,
+//   foreignBodies optional [{ key, body: async (world, id) => a body whose `key` holds `id`,
 //                 createForeign?: async (world) => { id } a row of B when `key` is not an ID of
 //                 the entry's own table (default: entry.createRow(world, "B")) }]
 //   warehouseScoped optional { request: async (world, warehouseId) => { id?, body?, query? } }
@@ -48,6 +49,14 @@ const product = {
   readRow: rawRow("Products"),
   countRows: rawCount("Products"),
 };
+
+// A stock write needs a warehouse and a product of the caller's organization that exist first.
+const stockBody = async (world, patch = {}) => ({
+  warehouseId: await world.createWarehouse("A"),
+  productId: await world.createProduct("A"),
+  quantity: 5,
+  ...patch,
+});
 
 // Added by the story that adds the route (rule 16): warehouses in E3-01, products in E3-04.
 const TENANT_ENDPOINTS = [
@@ -96,6 +105,32 @@ const TENANT_ENDPOINTS = [
     ],
     ...warehouse,
   },
+  // Stock receipt (E4-02). The row the endpoint creates is a movement; the warehouse is what a
+  // foreign key must be tried on, so `createRow` makes a warehouse (the default for foreignBodies).
+  {
+    method: "post",
+    path: "/api/stock/receive",
+    kind: "create",
+    action: "stock.receive",
+    idempotent: true,
+    body: (world) => stockBody(world),
+    // Every key of the body that ends in "Id" has one variant (the rule below enforces it): a
+    // warehouse or product of B is answered exactly like a random UUID (403 for the warehouse,
+    // which is authorized first, 404 for the product, which is looked up).
+    foreignBodies: [
+      { key: "warehouseId", body: (world, id) => stockBody(world, { warehouseId: id }) },
+      {
+        key: "productId",
+        createForeign: async (world) => ({ id: await world.createProduct("B") }),
+        body: (world, id) => stockBody(world, { productId: id }),
+      },
+    ],
+    // A Warehouse Admin or Viewer works only in the warehouses assigned to them.
+    warehouseScoped: { request: async (world, warehouseId) => ({ body: await stockBody(world, { warehouseId }) }) },
+    createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
+    readRow: rawRow("StockMovements"),
+    countRows: rawCount("StockMovements"),
+  },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
   {
@@ -116,6 +151,34 @@ const TENANT_ENDPOINTS = [
     ...product,
   },
 ];
+
+// Writes under stock/, transfers or imports (docs/06): each key of the body that ends in "Id" and
+// holds a UUID needs a foreignBodies variant that replaces exactly that key, so a new stock
+// endpoint cannot skip the foreign-key check. Returns the problems for one entry (empty = fine).
+const STOCK_WRITE = /^\/api\/(stock|transfers|imports)(\/|$)/;
+const UUID_VALUE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FOREIGN_MARK = "44444444-4444-4444-8444-444444444444";
+
+async function foreignBodyProblems(entry, world) {
+  if (entry.method === "get" || !STOCK_WRITE.test(entry.path)) return [];
+  const body = (await entry.body?.(world)) ?? {};
+  const idKeys = Object.keys(body).filter((key) => /Id$/.test(key) && typeof body[key] === "string" && UUID_VALUE.test(body[key]));
+  const variants = entry.foreignBodies ?? [];
+  const problems = [];
+  for (const key of idKeys) {
+    const variant = variants.find((v) => v.key === key);
+    if (!variant) {
+      problems.push(`${labelOf(entry)}: the body key "${key}" has no foreignBodies variant`);
+      continue;
+    }
+    const changed = await variant.body(world, FOREIGN_MARK);
+    if (changed[key] !== FOREIGN_MARK) problems.push(`${labelOf(entry)}: the "${key}" variant does not put the foreign id in "${key}"`);
+    for (const other of idKeys.filter((k) => k !== key)) {
+      if (changed[other] === FOREIGN_MARK) problems.push(`${labelOf(entry)}: the "${key}" variant also changes "${other}"`);
+    }
+  }
+  return problems;
+}
 
 const METHODS = ["get", "post", "put", "patch", "delete"];
 const KINDS = ["item", "list", "create"];
@@ -160,4 +223,4 @@ function validateEntry(entry) {
   return problems;
 }
 
-module.exports = { TENANT_ENDPOINTS, TENANT_ROLES, labelOf, allowedRoles, validateEntry };
+module.exports = { TENANT_ENDPOINTS, TENANT_ROLES, labelOf, allowedRoles, validateEntry, foreignBodyProblems };

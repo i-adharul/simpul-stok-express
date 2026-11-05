@@ -18,7 +18,6 @@ const PLANNED = {
   "transfer.destinations": "E5-06 transfer destinations endpoint",
   "stock.read": "E4-06 GET /api/stock",
   "history.read": "E4-07 GET /api/stock/movements",
-  "stock.receive": "E4-02 POST /api/stock/receive",
   "stock.adjust": "E4-04 POST /api/stock/adjust",
   "stock.transfer": "E5-04 POST /api/stock/transfers",
 };

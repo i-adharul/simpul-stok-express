@@ -1,5 +1,5 @@
 const { forbidden } = require("../helpers/errors");
-const { can, getAction } = require("../helpers/permissions");
+const { can, getAction, roleAllows } = require("../helpers/permissions");
 
 // Guards one ORGANIZATION-level action (for example "warehouse.manage"). It looks at the role only
 // and runs before the input is validated, so a role without the right gets 403 whatever the body
@@ -25,4 +25,25 @@ function requireCan(action) {
   return authorize;
 }
 
-module.exports = { requireCan };
+// The role half of a WAREHOUSE-level action (for example "stock.receive"). The warehouse is in the
+// body, which is read only after validation, so the handler finishes the job with
+// can(req.ctx, action, { warehouseId }). This guard exists so a role that may never perform the
+// action (a Viewer, a Platform admin) gets 403 before the header and the body are looked at
+// (rule 2: the role check comes first), exactly like requireCan does for organization actions.
+function requireRole(action) {
+  if (getAction(action).level !== "warehouse") {
+    throw new Error(`requireRole takes warehouse-level actions only, got: ${action}`);
+  }
+
+  function authorizeRole(req, res, next) {
+    if (!req.ctx) throw new Error("requireRole needs req.ctx: put authentication before it");
+    if (!roleAllows(req.ctx.role, action)) return next(forbidden());
+    return next();
+  }
+
+  // The same marker as requireCan, so the "every action is used" test sees this route.
+  authorizeRole.action = action;
+  return authorizeRole;
+}
+
+module.exports = { requireCan, requireRole };
