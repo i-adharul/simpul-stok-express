@@ -108,3 +108,85 @@ describe("POST /api/auth/logout", () => {
     expect((await me(token)).status).toBe(200);
   });
 });
+
+describe("GET /api/me: every 401 is the same", () => {
+  const jwt = require("jsonwebtoken");
+  const env = require("../config/env");
+  const UNAUTHENTICATED = {
+    code: "UNAUTHENTICATED",
+    message: "Sesi tidak valid. Silakan masuk lagi.",
+    details: null,
+  };
+  const expectRejected = (res) => {
+    expect(res.status).toBe(401);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.body).toEqual(UNAUTHENTICATED);
+  };
+
+  it("no token", async () => {
+    expectRejected(await me());
+  });
+
+  it("a header that is not a Bearer token", async () => {
+    const res = await request(app).get("/api/me").set("Authorization", "Basic dXNlcjpwYXNz");
+
+    expectRejected(res);
+  });
+
+  it("a broken token", async () => {
+    expectRejected(await me("garbage"));
+  });
+
+  it("a token signed with another secret", async () => {
+    const user = await createAccount();
+    const forged = jwt.sign({}, "x".repeat(40), { subject: user.id, expiresIn: "8h" });
+
+    expectRejected(await me(forged));
+  });
+
+  it("an expired token", async () => {
+    const user = await createAccount();
+
+    expectRejected(await me(signToken(user.id, "-1s")));
+  });
+
+  it("an inactive user, even with a valid token", async () => {
+    const user = await createAccount();
+    const token = signToken(user.id);
+    expect((await me(token)).status).toBe(200);
+    await getSequelize().query('UPDATE "Users" SET "isActive" = false');
+
+    expectRejected(await me(token));
+  });
+
+  it("a user who no longer exists", async () => {
+    const user = await createAccount();
+    const token = signToken(user.id);
+    await getSequelize().query('DELETE FROM "Users"');
+
+    expectRejected(await me(token));
+  });
+
+  it("a token issued before the last password change", async () => {
+    const user = await createAccount();
+    const old = jwt.sign({ iat: Math.floor(Date.now() / 1000) - 60 }, env.JWT_SECRET, {
+      subject: user.id,
+      expiresIn: "8h",
+    });
+    await getSequelize().query('UPDATE "Users" SET "passwordChangedAt" = now()');
+
+    expectRejected(await me(old));
+  });
+
+  it("a token for a user, after login with the real endpoint, works once and stops after deactivation", async () => {
+    const user = await createAccount({ email: "owner@example.com" });
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: user.password });
+    const token = login.body.token;
+
+    expect((await me(token)).status).toBe(200);
+    await getSequelize().query('UPDATE "Users" SET "isActive" = false');
+    expectRejected(await me(token));
+  });
+});
