@@ -195,3 +195,42 @@ describe("idempotency checks (entries with idempotent: true)", () => {
     expect(failures.join("\n")).toMatch(/B's id was not refused \(status 201\)/);
   });
 });
+
+// One table for the whole harness: each deliberate flaw, the entry that exposes it, and the name
+// of the check that must catch it. The full runChecks must fail, and the named check alone too.
+const FLAWS = [
+  ["noAuthentication", "read", "noToken"],
+  ["noRoleCheck", "patch", "platformAdmin"],
+  ["noRoleCheck", "patch", "roleWithoutRight"],
+  ["foreign403", "read", "foreignItem"],
+  ["foreignMessage", "read", "foreignItem"],
+  ["updatesForeign", "patch", "foreignItem"],
+  ["listLeaks", "list", "list"],
+  ["cursorLeaks", "list", "cursor"],
+  ["trustsQueryOrg", "list", "organizationIdInput"],
+  ["trustsBodyOrg", "create", "organizationIdInput"],
+  ["patchMovesRow", "patch", "organizationIdInput"],
+  ["parentLeak", "create", "foreignBodies"],
+  ["noKeyCheck", "create", "idempotencyKey"],
+  ["malformedKeyAccepted", "create", "idempotencyKey"],
+  ["noReplayHeader", "create", "idempotentReplay"],
+  ["replayCreatesAgain", "create", "idempotentReplay"],
+];
+
+describe("every deliberate flaw is caught by the check meant for it", () => {
+  it.each(FLAWS)("%s on the %s route is caught by %s", async (flaw, entryName, checkName) => {
+    const { app, store } = buildFakeApp({ [flaw]: true });
+    const entry = fakeEntries(store)[entryName];
+
+    expect((await CHECKS[checkName](app, entry, world)).length).toBeGreaterThan(0);
+    expect((await runChecks(app, entry, world)).length).toBeGreaterThan(0);
+  });
+
+  it("covers every flaw the fake app knows (none is left untested)", () => {
+    const fs = require("fs");
+    const source = fs.readFileSync(require.resolve("./support/fakeTenantApp"), "utf8");
+    const known = [...source.matchAll(/flaws\.(\w+)/g)].map((m) => m[1]);
+
+    expect([...new Set(known)].sort()).toEqual([...new Set(FLAWS.map(([flaw]) => flaw))].sort());
+  });
+});
