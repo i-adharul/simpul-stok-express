@@ -1,0 +1,51 @@
+### Warehouses (E3-01). Local server: cd server && npm run dev
+# Needs the seed: cd server && npx sequelize db:seed:all
+# Log in first (http/auth.http); the token of the Owner goes into @token below.
+@token = paste-the-token-here
+@baseUrl = http://localhost:3000
+# An ID from the list answer:
+@warehouseId = paste-a-warehouse-id-here
+
+### List: every tenant role. The Owner sees all active warehouses, others only the assigned ones.
+# Expect 200 { items: [{ id, organizationId, code, name, address, archivedAt, createdAt, updatedAt }], total, page, pageSize }
+GET {{baseUrl}}/api/warehouses?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### List with archived warehouses (honoured for the Owner only)
+GET {{baseUrl}}/api/warehouses?includeArchived=true
+Authorization: Bearer {{token}}
+
+### Invalid query
+# Expect 400 VALIDATION_ERROR with details [{ "source": "query", "path": "pageSize", ... }]
+GET {{baseUrl}}/api/warehouses?page=0&pageSize=101
+Authorization: Bearer {{token}}
+
+### Detail with the assigned users (no emails)
+# Expect 200: the warehouse plus "assignedUsers": [{ id, name, role }].
+# 403 for a Warehouse Admin or Viewer who is not assigned; 404 for a missing, malformed or foreign ID.
+GET {{baseUrl}}/api/warehouses/{{warehouseId}}
+Authorization: Bearer {{token}}
+
+### Create (Owner only). The code is trimmed and stored uppercase; an empty address is stored as null.
+# Expect 201 with the warehouse. 409 CONFLICT "Kode gudang sudah dipakai." when the code exists.
+POST {{baseUrl}}/api/warehouses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "gd-sudirman", "name": "Gudang Sudirman", "address": "Jl. Jenderal Sudirman No. 1" }
+
+### Create with an unknown field
+# Expect 400 VALIDATION_ERROR, details [{ "source": "body", "path": "organizationId", "message": "Field tidak dikenal." }]
+POST {{baseUrl}}/api/warehouses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "GD-2", "name": "Gudang Dua", "organizationId": "00000000-0000-4000-8000-000000000000" }
+
+### Update (Owner only, at least one of code, name, address). "" clears the address.
+# Expect 200 with the warehouse. 404 for an archived warehouse until it is restored (E3-03).
+PATCH {{baseUrl}}/api/warehouses/{{warehouseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Gudang Sudirman Baru", "address": "" }

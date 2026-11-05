@@ -247,6 +247,15 @@ describe("POST /api/warehouses", () => {
     expect(await warehouseRows(orgA())).toHaveLength(1);
   });
 
+  it("lets only one of two simultaneous requests for the same code win (the other gets 409)", async () => {
+    const results = await Promise.all(
+      [1, 2, 3, 4].map((n) => send("post", "/api/warehouses", { code: "RACE", name: `Gudang ${n}` })),
+    );
+
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409, 409]);
+    expect(await warehouseRows(orgA())).toHaveLength(1);
+  });
+
   it("allows the same code in another organization", async () => {
     await world.createWarehouse("B", "GD-1");
 
