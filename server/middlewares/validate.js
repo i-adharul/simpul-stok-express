@@ -27,7 +27,7 @@ function validate(schemas) {
     throw new Error("validate() needs at least one schema");
   }
 
-  return function validateRequest(req, res, next) {
+  function validateRequest(req, res, next) {
     const valid = {};
     const details = [];
 
@@ -41,7 +41,11 @@ function validate(schemas) {
     if (details.length > 0) return next(validationError(details));
     req.valid = valid;
     return next();
-  };
+  }
+
+  // The static test (rule 4) looks for this mark in each write route's handler list.
+  validateRequest.isValidate = true;
+  return validateRequest;
 }
 
 module.exports = validate;
