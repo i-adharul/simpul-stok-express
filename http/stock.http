@@ -45,3 +45,11 @@ Idempotency-Key: 0c9b6f2e-5d77-4b0a-8c1e-2a6d93f1b7a4
 Content-Type: application/json
 
 { "warehouseId": "{{warehouseId}}", "productId": "{{productId}}", "mode": "SET", "value": 40, "reason": "STOCK_OPNAME", "note": "Hitung ulang rak A" }
+
+### Stock summary (every tenant role)
+# One row per (warehouse, product) pair that HAS a stock row. Query (all optional): warehouseId, productId, q (SKU or name),
+# status (OUT, LOW, OK), page, pageSize (max 100).
+# Expect 200 { items: [{ warehouse, product, quantity, status, updatedAt }], total, page, pageSize, summary: { out, low, ok } }.
+# 400 for a malformed id, an unknown status or paging out of range. 403 for a warehouseId the caller cannot reach (one body).
+GET {{baseUrl}}/api/stock?status=LOW&page=1&pageSize=20
+Authorization: Bearer {{token}}

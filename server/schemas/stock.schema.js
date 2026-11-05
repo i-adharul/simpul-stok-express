@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { listQuerySchema } = require("./pagination.schema");
 
 // IDs are lowercased first so "ABC..." and "abc..." are the same warehouse and product.
 // A malformed ID in a body is a 400 (unlike one in a URL, which is a 404, rule 2).
@@ -44,4 +45,19 @@ const adjustSchema = z
     }
   });
 
-module.exports = { receiveSchema, adjustSchema, REASONS };
+// GET /api/stock. A malformed ID, an unknown status or paging out of range is a 400. An empty `q`
+// (after trimming) means "no search". `includeArchived` is not part of this query (it is rejected
+// as an unknown key): archived products are decided by their quantity, not by a flag.
+const stockListQuerySchema = listQuerySchema.pick({ page: true, pageSize: true }).extend({
+  warehouseId: id.optional(),
+  productId: id.optional(),
+  q: z
+    .string()
+    .trim()
+    .max(100)
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
+  status: z.enum(["OUT", "LOW", "OK"]).optional(),
+});
+
+module.exports = { receiveSchema, adjustSchema, stockListQuerySchema, REASONS };

@@ -3,6 +3,7 @@ const { can } = require("../helpers/permissions");
 const { tenant } = require("../helpers/tenantScope");
 const idempotencyService = require("../services/idempotencyService");
 const stockService = require("../services/stockService");
+const stockSummaryService = require("../services/stockSummaryService");
 
 // Only immutable data of the movement leaves the server, never the balance, so a replay is equal
 // to the first answer (docs/04). `quantity` is the signed change of the movement.
@@ -72,4 +73,9 @@ async function adjust(req, res) {
   res.status(201).json(body);
 }
 
-module.exports = { receive, adjust };
+// The role was checked by the route (requireRole); the service authorizes `warehouseId` first.
+async function list(req, res) {
+  res.status(200).json(await stockSummaryService.listStock(req.ctx, req.valid.query));
+}
+
+module.exports = { receive, adjust, list };
