@@ -1,4 +1,5 @@
 ### Login (public, no token). Local server: cd server && npm run dev
+# @name login
 # Needs the seed: cd server && npx sequelize db:seed:all
 # Expect 200 {"token","user":{"id","name","email","role"},"redirectTo":"/dashboard"} and Cache-Control: no-store.
 # The email is trimmed and matched in lowercase. The token holds only sub, iat and exp (8 hours).
@@ -26,3 +27,15 @@ POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 
 { "email": "owner@example.com" }
+
+### Current user. Run the first request ("login") before this one, then paste its token.
+# Expect 200 {"user":{"id","name","email","role"},"organization":{"id","name","slug","status"} | null}
+GET http://localhost:3000/api/me
+Authorization: Bearer {{login.response.body.token}}
+
+### No token, a broken token, an expired token, an inactive user: one identical answer
+# Expect 401 {"code":"UNAUTHENTICATED","message":"Sesi tidak valid. Silakan masuk lagi.","details":null}
+GET http://localhost:3000/api/me
+
+### Logout: always 204, with or without a token. The server keeps no session; the client deletes its token.
+POST http://localhost:3000/api/auth/logout
