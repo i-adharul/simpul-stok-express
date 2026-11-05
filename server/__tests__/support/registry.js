@@ -16,7 +16,9 @@
 //                 (needed for "create" entries and for idempotent ones)
 //   supportsCursor  optional true: a list that takes a cursor; `cursorParam` names it (default "cursor")
 //   idempotent    optional true: the endpoint needs an Idempotency-Key
-//   foreignBodies optional [{ key, body: (world, id) => a body whose `key` holds `id` }]
+//   foreignBodies optional [{ key, body: (world, id) => a body whose `key` holds `id`,
+//                 createForeign?: async (world) => { id } a row of B when `key` is not an ID of
+//                 the entry's own table (default: entry.createRow(world, "B")) }]
 //   warehouseScoped optional { request: async (world, warehouseId) => { id?, body?, query? } }
 //                 for an endpoint whose answer depends on the caller's warehouse assignment (a
 //                 warehouse-level action, or the warehouse detail): builds the request for that
@@ -84,6 +86,14 @@ const TENANT_ENDPOINTS = [
     kind: "item",
     action: "member.manage",
     body: () => ({ userIds: [] }),
+    // A user of organization B in the list is answered exactly like a user that does not exist.
+    foreignBodies: [
+      {
+        key: "userIds",
+        createForeign: async (world) => ({ id: world.users.B.VIEWER.id }),
+        body: (world, id) => ({ userIds: [id] }),
+      },
+    ],
     ...warehouse,
   },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", ...product },
@@ -140,8 +150,8 @@ function validateEntry(entry) {
   }
   if (entry.idempotent && entry.method === "get") problems.push("a get entry cannot be idempotent");
   if (entry.foreignBodies) {
-    if (!Array.isArray(entry.foreignBodies) || entry.foreignBodies.some((f) => !f.key || typeof f.body !== "function")) {
-      problems.push("foreignBodies must be a list of { key, body(world, id) }");
+    if (!Array.isArray(entry.foreignBodies) || entry.foreignBodies.some((f) => !f.key || typeof f.body !== "function" || (f.createForeign && typeof f.createForeign !== "function"))) {
+      problems.push("foreignBodies must be a list of { key, body(world, id), createForeign? }");
     }
   }
   if (entry.warehouseScoped && typeof entry.warehouseScoped.request !== "function") {
