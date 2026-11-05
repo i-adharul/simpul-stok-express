@@ -2,6 +2,7 @@ const { Op, literal } = require("sequelize");
 const { conflict, forbidden, insufficientStock, notFound, validationError } = require("../helpers/errors");
 const { tenant } = require("../helpers/tenantScope");
 const { MAX_QUANTITY } = require("./stockService");
+const { createWithCode } = require("./transferCode");
 const { lockWarehouse } = require("./warehouseLock");
 
 // Transfer between warehouses (BL13). Business rules only: no HTTP here, and no transaction of its
@@ -114,18 +115,22 @@ async function decrementSources(ctx, warehouseId, items, transaction) {
 // The destination, after the sources. The rows that exist are read once (the warehouse lock is
 // held, so nobody changes them meanwhile) and every new total is checked against the column limit
 // BEFORE the first write, so a 409 leaves nothing half done even before the rollback. A row that
-// is missing is created (BL13); one that exists is increased.
+// exists is increased; the rows that are missing are created together by ONE bulkCreate (BL13).
+// `ignoreDuplicates` (ON CONFLICT DO NOTHING) is only a belt: under the lock no other writer can
+// have created one of these rows since the read, so nothing is ever skipped silently.
 async function incrementDestinations(ctx, warehouseId, items, transaction) {
   const levels = tenant(ctx).StockLevel;
   const rows = await levels.findAll({ where: { warehouseId, productId: items.map((item) => item.productId) }, transaction });
   const byProduct = new Map(rows.map((row) => [row.productId, row]));
   const totals = items.map((item) => destinationQuantity(byProduct.get(item.productId)?.quantity ?? 0, item.quantity));
 
+  const missing = [];
   for (const [index, item] of items.entries()) {
     const row = byProduct.get(item.productId);
     if (row) await row.update({ quantity: totals[index] }, { transaction });
-    else await levels.create({ warehouseId, productId: item.productId, quantity: totals[index] }, { transaction });
+    else missing.push({ warehouseId, productId: item.productId, quantity: totals[index] });
   }
+  if (missing.length > 0) await levels.bulkCreate(missing, { transaction, ignoreDuplicates: true });
 }
 
 // The stock half of a transfer: sources first, then the destination. `items` is already ordered by
@@ -133,6 +138,57 @@ async function incrementDestinations(ctx, warehouseId, items, transaction) {
 async function moveStock(ctx, { fromWarehouseId, toWarehouseId, items }, transaction) {
   await decrementSources(ctx, fromWarehouseId, items, transaction);
   await incrementDestinations(ctx, toWarehouseId, items, transaction);
+}
+
+// Two immutable rows per item, written by one bulkCreate and tied together by the same transferId
+// (BL13): TRANSFER_OUT with the negative quantity in the source, TRANSFER_IN with the positive one
+// in the destination. The transfer note lives on the header, so the movements carry none.
+async function writeMovements(ctx, transfer, items, transaction) {
+  const row = (warehouseId, productId, quantityDelta, type) => ({
+    warehouseId,
+    productId,
+    quantityDelta,
+    type,
+    transferId: transfer.id,
+    createdById: ctx.userId,
+  });
+  const rows = items.flatMap(({ productId, quantity }) => [
+    row(transfer.fromWarehouseId, productId, -quantity, "TRANSFER_OUT"),
+    row(transfer.toWarehouseId, productId, quantity, "TRANSFER_IN"),
+  ]);
+  await tenant(ctx).StockMovement.bulkCreate(rows, { transaction });
+}
+
+// BL13 as a whole, in the one transaction the idempotency service opened: check and lock, move the
+// stock, write the header with its code, write the movements. Returns the ID of the transfer: that
+// is the resource the idempotency key points to, and the answer is built from stored rows by
+// getTransfer, never from balances.
+async function transfer(ctx, input, transaction) {
+  const { items } = await prepareTransfer(ctx, input, transaction);
+  const { fromWarehouseId, toWarehouseId } = input;
+  await moveStock(ctx, { fromWarehouseId, toWarehouseId, items }, transaction);
+  const header = await createWithCode(ctx, { fromWarehouseId, toWarehouseId, note: input.note ?? null, createdById: ctx.userId }, transaction);
+  await writeMovements(ctx, header, items, transaction);
+  return header.id;
+}
+
+// The answer of a transfer, from the stored header and its TRANSFER_OUT movements only (immutable
+// data, so a replay equals the first answer whatever the stock is by then). Items are in productId
+// order and `quantity` is the positive amount that left the source. null when there is no such
+// transfer for this organization.
+async function getTransfer(ctx, id) {
+  const header = await tenant(ctx).StockTransfer.findByPk(id);
+  if (!header) return null;
+  const out = await tenant(ctx).StockMovement.findAll({ where: { transferId: id, type: "TRANSFER_OUT" }, order: [["productId", "ASC"]] });
+  return {
+    id: header.id,
+    code: header.code,
+    fromWarehouseId: header.fromWarehouseId,
+    toWarehouseId: header.toWarehouseId,
+    items: out.map((movement) => ({ productId: movement.productId, quantity: -movement.quantityDelta })),
+    note: header.note,
+    createdAt: header.createdAt,
+  };
 }
 
 module.exports = {
@@ -146,4 +202,7 @@ module.exports = {
   decrementSources,
   incrementDestinations,
   moveStock,
+  writeMovements,
+  transfer,
+  getTransfer,
 };

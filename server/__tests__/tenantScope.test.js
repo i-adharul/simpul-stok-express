@@ -15,6 +15,7 @@ const fakeModel = () => ({
   findOne: jest.fn().mockResolvedValue("one"),
   count: jest.fn().mockResolvedValue(3),
   create: jest.fn().mockResolvedValue("created"),
+  bulkCreate: jest.fn().mockResolvedValue(["many"]),
   update: jest.fn().mockResolvedValue([1]),
 });
 
@@ -103,9 +104,20 @@ describe("scopeModel injects the organization into every method", () => {
     );
   });
 
-  it("exposes only these six methods", () => {
+  it("bulkCreate adds the organization to every row, after the row's own values", async () => {
+    const Model = fakeModel();
+
+    await scopeModel(Model, ORG).bulkCreate([{ code: "A" }, { code: "B", organizationId: OTHER }], { transaction: "t", ignoreDuplicates: true });
+
+    expect(Model.bulkCreate).toHaveBeenCalledWith(
+      [{ code: "A", organizationId: ORG }, { code: "B", organizationId: ORG }],
+      { transaction: "t", ignoreDuplicates: true },
+    );
+  });
+
+  it("exposes only these seven methods", () => {
     expect(Object.keys(scopeModel(fakeModel(), ORG)).sort()).toEqual(
-      ["count", "create", "findAll", "findByPk", "findOne", "update"],
+      ["bulkCreate", "count", "create", "findAll", "findByPk", "findOne", "update"],
     );
   });
 });

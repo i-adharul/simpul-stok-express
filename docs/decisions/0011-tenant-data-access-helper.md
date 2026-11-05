@@ -12,10 +12,12 @@ for us, so isolation has to be built explicitly, and it has to be hard to go aro
 
 ## Decision
 
-- **One door.** `helpers/tenantScope.js` exports `tenant(ctx)`. `tenant(ctx).<Model>` offers exactly six
-  methods: `findAll`, `findOne`, `findByPk`, `count`, `create` and `update`. There is no `destroy`, no
-  `bulkCreate` and no raw query, so nothing on this door can skip the filter (business data is archived,
-  not deleted). A method is added only by a story that needs it, with a test.
+- **One door.** `helpers/tenantScope.js` exports `tenant(ctx)`. `tenant(ctx).<Model>` offers exactly seven
+  methods: `findAll`, `findOne`, `findByPk`, `count`, `create`, `bulkCreate` and `update`. There is no
+  `destroy` and no raw query, so nothing on this door can skip the filter (business data is archived,
+  not deleted). A method is added only by a story that needs it, with a test. `bulkCreate` was added for
+  the transfer (two movements per item in one statement); like `create` it writes `organizationId` from
+  the context on every row, after the row's own values.
 - **Which models.** Every model that has an `organizationId` attribute is offered, detected at load time.
   `Plan` and `WebhookEvent` (global) and `Organization` (the tenant itself) are not offered.
 - **The filter cannot be replaced.** The caller's `where` is combined with `{ organizationId }` by

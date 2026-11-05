@@ -52,6 +52,31 @@ describe("create always takes organizationId from the context", () => {
   });
 });
 
+describe("bulkCreate takes organizationId from the context for every row", () => {
+  it("writes the caller's organization on all rows and ignores an organizationId in the input", async () => {
+    const mine = await createOrganization("tokosaya");
+    const theirs = await createOrganization("tokolain");
+
+    await tenant({ organizationId: mine }).Warehouse.bulkCreate([
+      { code: "GD-1", name: "Gudang 1" },
+      { code: "GD-2", name: "Gudang 2", organizationId: theirs },
+    ]);
+
+    const rows = await rowsOf("Warehouses");
+    expect(rows.map((row) => [row.code, row.organizationId])).toEqual([["GD-1", mine], ["GD-2", mine]]);
+  });
+
+  it("rolls back with the transaction it is given", async () => {
+    const org = await createOrganization("tokosaya");
+
+    const t = await db.sequelize.transaction();
+    await tenant({ organizationId: org }).Warehouse.bulkCreate([{ code: "GD-1", name: "Gudang 1" }], { transaction: t });
+    await t.rollback();
+
+    expect(await rowsOf("Warehouses")).toHaveLength(0);
+  });
+});
+
 describe("two organizations: the wrapper returns and changes only its own data", () => {
   let a, b, ctxA, ctxB, aWarehouse, bWarehouse;
 
