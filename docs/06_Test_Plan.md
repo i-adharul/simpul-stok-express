@@ -44,7 +44,7 @@ Every route of the Express app must be accounted for in the cross-tenant harness
 | `EXEMPT_ROUTES` (`exemptions.js`) | A tenant route that cannot be tested this way. | A written reason |
 | `PUBLIC_ROUTES` (`exemptions.js`) | A route that is not tenant at all (login, health, `/me`). | A written reason; it must not use the tenant data access |
 
-A registry entry has a `kind`: `item` (an endpoint addressed by one row's ID), `list`, or `create`. Together with the permission (`action`, from `helpers/permissions.js`) and the role list derived from it (`allowedRoles`), a way to create a row for either organization (`createRow`), and a way to read it back (`readRow`), that is all the harness needs. Optional fields: `supportsCursor`, `idempotent: true`, and `foreignBodies`. For each entry it then runs, from organization A's session against organization B's data:
+A registry entry has a `kind`: `item` (an endpoint addressed by one row's ID), `list`, or `create`. Together with the permission (`action`, from `helpers/permissions.js`) and the role list derived from it (`allowedRoles`), a way to create a row for either organization (`createRow`), and a way to read it back (`readRow`), that is all the harness needs. Optional fields: `supportsCursor`, `idempotent: true`, and `foreignBodies` (an item may add `createForeign` when its key holds the ID of a different kind of row, for example a user ID in the warehouse assignment). For each entry it then runs, from organization A's session against organization B's data:
 
 | Check | Expectation |
 | --- | --- |

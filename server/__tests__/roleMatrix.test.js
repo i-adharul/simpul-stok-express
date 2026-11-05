@@ -20,7 +20,7 @@ afterAll(async () => {
 });
 
 describe("role matrix on every endpoint of the registry (real app)", () => {
-  it("reads the registry (it fills up from E3-01 on)", () => {
+  it("reads the registry (it fills up with every tenant endpoint)", () => {
     expect(Array.isArray(TENANT_ENDPOINTS)).toBe(true);
   });
 

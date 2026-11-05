@@ -26,6 +26,33 @@ describe("the registry as written", () => {
   });
 });
 
+describe("warehouse and product endpoints (E3)", () => {
+  // Written out by hand, so deleting an entry (or a route and its entry together) is noticed.
+  const EXPECTED = [
+    "GET /warehouses",
+    "GET /warehouses/:id",
+    "POST /warehouses",
+    "PATCH /warehouses/:id",
+    "GET /warehouses/:id/members",
+    "PUT /warehouses/:id/members",
+    "GET /products",
+    "GET /products/:id",
+    "POST /products",
+    "PATCH /products/:id",
+  ];
+
+  it("are all in the tenant-isolation registry", () => {
+    expect(TENANT_ENDPOINTS.map(labelOf)).toEqual(expect.arrayContaining(EXPECTED));
+  });
+
+  it("the assignment endpoint attacks the userIds key with a user of the other organization", () => {
+    const entry = TENANT_ENDPOINTS.find((e) => labelOf(e) === "PUT /warehouses/:id/members");
+
+    expect(entry.foreignBodies.map((f) => f.key)).toEqual(["userIds"]);
+    expect(typeof entry.foreignBodies[0].createForeign).toBe("function");
+  });
+});
+
 describe("the exemption lists", () => {
   it.each([["EXEMPT_ROUTES", EXEMPT_ROUTES], ["PUBLIC_ROUTES", PUBLIC_ROUTES]])(
     "%s: every label has a written reason",
@@ -70,6 +97,7 @@ describe("validateEntry", () => {
     [{ kind: "create", method: "post", path: "/api/things" }, /countRows/],
     [{ method: "get", idempotent: true, countRows: async () => 0 }, /cannot be idempotent/],
     [{ foreignBodies: [{ key: "warehouseId" }] }, /foreignBodies/],
+    [{ foreignBodies: [{ key: "userIds", body: () => ({}), createForeign: "no" }] }, /foreignBodies/],
     [{ warehouseScoped: {} }, /warehouseScoped/],
   ])("rejects %p", (extra, message) => {
     expect(validateEntry(valid(extra)).join(" | ")).toMatch(message);

@@ -191,8 +191,10 @@ async function checkOrganizationIdInput(app, entry, world) {
 async function checkForeignBodies(app, entry, world) {
   const failures = [];
   const user = attacker(entry, world);
-  for (const { key, body } of entry.foreignBodies ?? []) {
-    const foreign = await entry.createRow(world, "B");
+  for (const { key, body, createForeign } of entry.foreignBodies ?? []) {
+    // The foreign value is usually another row of the entry's own table; a key that points at a
+    // different kind of row (a user ID in a warehouse endpoint) says how to make one itself.
+    const foreign = createForeign ? await createForeign(world) : await entry.createRow(world, "B");
     const id = entry.kind === "item" ? (await entry.createRow(world, "A")).id : undefined;
     const counts = async () =>
       entry.countRows ? [await entry.countRows(world.organizations.A), await entry.countRows(world.organizations.B)] : [];

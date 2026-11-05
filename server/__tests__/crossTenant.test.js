@@ -21,7 +21,7 @@ afterAll(async () => {
 });
 
 describe("cross-tenant harness on the real app", () => {
-  it("reads the registry (it is empty until the first tenant endpoint, E3-01)", () => {
+  it("reads the registry (it fills up with every tenant endpoint)", () => {
     expect(Array.isArray(TENANT_ENDPOINTS)).toBe(true);
   });
 
