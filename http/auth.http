@@ -39,3 +39,13 @@ GET http://localhost:3000/api/me
 
 ### Logout: always 204, with or without a token. The server keeps no session; the client deletes its token.
 POST http://localhost:3000/api/auth/logout
+
+### Change password. Run "login" first. Success returns a NEW token; every older token (also on other devices) gets 401.
+# Expect 200 {"token"}. A wrong current password gives 400 INVALID_CURRENT_PASSWORD.
+# A refused new password gives 400 VALIDATION_ERROR with the reason in message and in details[0].
+# Note: this changes the seeded password. Undo it with a second call that puts the demo password back.
+PATCH http://localhost:3000/api/me/password
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{ "currentPassword": "Simpul-Demo-2026", "newPassword": "Kopi-Susu-2027" }
