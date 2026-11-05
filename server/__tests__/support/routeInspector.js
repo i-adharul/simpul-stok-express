@@ -22,6 +22,11 @@ function listRoutes(app) {
         label: `${method.toUpperCase()} ${route.path}`,
         // A route validates when `validate` runs before the last handler (the controller).
         validates: route.stack.slice(0, -1).some((layer) => layer.handle.isValidate === true),
+        // The organization-level actions guarded by requireCan before the controller.
+        actions: route.stack
+          .slice(0, -1)
+          .map((layer) => layer.handle.action)
+          .filter((action) => typeof action === "string"),
         // Same idea for the subscription check (rule 17): it must run before the controller.
         guarded: route.stack
           .slice(0, -1)
