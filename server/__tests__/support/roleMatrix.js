@@ -5,6 +5,7 @@
 const { allowedRoles, labelOf, TENANT_ROLES } = require("./registry");
 const { ACTIONS } = require("../../helpers/permissions");
 const { send, validBody, fail, expectStatus } = require("./harness");
+const { assignWarehouse } = require("./factories");
 
 // A request the role would be fully entitled to make, as far as the role alone is concerned:
 // the caller's own row for an item, a valid body for a write.
@@ -27,7 +28,11 @@ async function checkRoleMatrix(app, entry, world) {
     const res = await send(app, entry, await ownRequest(entry, world, role));
     if (!allowed.includes(role)) {
       failures.push(...expectStatus(entry, `${role} (the matrix denies ${entry.action})`, res, 403));
-    } else if (ACTIONS[entry.action].level === "organization" && [401, 403].includes(res.status)) {
+    } else if (
+      ACTIONS[entry.action].level === "organization" &&
+      !entry.warehouseScoped &&
+      [401, 403].includes(res.status)
+    ) {
       failures.push(fail(entry, `${role} (the matrix allows ${entry.action}): refused with ${res.status}`));
     }
   }
@@ -41,4 +46,49 @@ async function checkRoleMatrix(app, entry, world) {
   return failures;
 }
 
-module.exports = { checkRoleMatrix, ownRequest };
+// A Viewer changes nothing: every write endpoint answers a Viewer 403. Written out by hand, not
+// derived from the matrix, so a wrong edit of the matrix cannot make this pass.
+async function checkViewerWrites(app, entry, world) {
+  if (entry.method === "get") return [];
+  const res = await send(app, entry, await ownRequest(entry, world, "VIEWER"));
+  return expectStatus(entry, "Viewer writing", res, 403);
+}
+
+// A Warehouse Admin and a Viewer reach only the warehouses assigned to them, for warehouse-level
+// actions and for the warehouse detail. In organization A: warehouse 1 is assigned to both,
+// warehouse 2 to nobody. An unassigned warehouse is 403 for them; an assigned one gives the
+// answer of the matrix; the Owner reaches both.
+async function checkUnassignedWarehouse(app, entry, world) {
+  if (!entry.warehouseScoped) return [];
+  const orgA = world.organizations.A;
+  const assigned = await world.createWarehouse("A");
+  const unassigned = await world.createWarehouse("A");
+  for (const role of ["WAREHOUSE_ADMIN", "VIEWER"]) {
+    await assignWarehouse(orgA, world.users.A[role].id, assigned);
+  }
+
+  const failures = [];
+  const ask = async (role, warehouseId) =>
+    send(app, entry, {
+      authorization: world.users.A[role].authorization,
+      ...(await entry.warehouseScoped.request(world, warehouseId)),
+    });
+
+  for (const role of ["WAREHOUSE_ADMIN", "VIEWER"]) {
+    failures.push(...expectStatus(entry, `${role} on a warehouse that is not assigned`, await ask(role, unassigned), 403));
+
+    const res = await ask(role, assigned);
+    if (!allowedRoles(entry).includes(role)) {
+      failures.push(...expectStatus(entry, `${role} (the matrix denies ${entry.action}) on an assigned warehouse`, res, 403));
+    } else if ([401, 403].includes(res.status)) {
+      failures.push(fail(entry, `${role} on an assigned warehouse: refused with ${res.status}`));
+    }
+  }
+  for (const warehouseId of [assigned, unassigned]) {
+    const res = await ask("OWNER", warehouseId);
+    if ([401, 403].includes(res.status)) failures.push(fail(entry, `OWNER on an active warehouse: refused with ${res.status}`));
+  }
+  return failures;
+}
+
+module.exports = { checkRoleMatrix, checkViewerWrites, checkUnassignedWarehouse, ownRequest };

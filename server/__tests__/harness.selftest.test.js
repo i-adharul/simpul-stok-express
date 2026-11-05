@@ -218,7 +218,7 @@ const FLAWS = [
 ];
 
 // Flaws that are caught by the role checks of roleMatrix.test.js instead of the harness.
-const ROLE_FLAWS = ["refusesViewerRead"];
+const ROLE_FLAWS = ["refusesViewerRead", "ignoresAssignment", "detailIgnoresAssignment"];
 
 describe("every deliberate flaw is caught by the check meant for it", () => {
   it.each(FLAWS)("%s on the %s route is caught by %s", async (flaw, entryName, checkName) => {
