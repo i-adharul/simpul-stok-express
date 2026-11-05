@@ -43,9 +43,25 @@ Content-Type: application/json
 { "code": "GD-2", "name": "Gudang Dua", "organizationId": "00000000-0000-4000-8000-000000000000" }
 
 ### Update (Owner only, at least one of code, name, address). "" clears the address.
-# Expect 200 with the warehouse. 404 for an archived warehouse until it is restored (E3-03).
+# Expect 200 with the warehouse. 404 for an archived warehouse unless the body restores it (archived: false).
 PATCH {{baseUrl}}/api/warehouses/{{warehouseId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "name": "Gudang Sudirman Baru", "address": "" }
+
+### Archive (Owner only). Allowed only when every stock row of the warehouse is 0.
+# Expect 200 with archivedAt set. 409 CONFLICT "Gudang masih memiliki stok. Kosongkan stok sebelum mengarsipkan." otherwise.
+PATCH {{baseUrl}}/api/warehouses/{{warehouseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "archived": true }
+
+### Restore (an archived warehouse is found only for this)
+# Expect 200 with archivedAt null.
+PATCH {{baseUrl}}/api/warehouses/{{warehouseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "archived": false }

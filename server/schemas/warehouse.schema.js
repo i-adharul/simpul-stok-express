@@ -25,12 +25,14 @@ const createWarehouseSchema = z.object({
   address: address.optional(),
 });
 
-// At least one field, otherwise the request changes nothing. The same field rules as create.
+// At least one field, otherwise the request changes nothing. The same field rules as create, plus
+// `archived`: true archives, false restores (BL08).
 const updateWarehouseSchema = z
   .object({
     code: code.optional(),
     name: name.optional(),
     address: address.optional(),
+    archived: z.boolean().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, {
     message: "Minimal satu field wajib diisi.",

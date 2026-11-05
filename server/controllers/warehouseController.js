@@ -1,8 +1,9 @@
-const { Op, UniqueConstraintError } = require("sequelize");
-const { conflict, forbidden, notFound } = require("../helpers/errors");
+const { Op } = require("sequelize");
+const { forbidden, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
 const { tenant } = require("../helpers/tenantScope");
+const warehouseService = require("../services/warehouseService");
 
 // Only the documented fields leave the server (docs/04), so a column added later is not exposed
 // by accident.
@@ -73,26 +74,14 @@ async function show(req, res) {
   res.status(200).json({ ...toWarehouse(warehouse), assignedUsers });
 }
 
-// The unique key (organizationId, code) is the single source of truth for "code exists": the
-// database decides, so two requests racing for one code cannot both succeed. No check-then-insert.
-function rethrowDuplicateCode(err) {
-  if (err instanceof UniqueConstraintError) throw conflict("Kode gudang sudah dipakai.");
-  throw err;
-}
-
-// organizationId is added by the tenant-scoped create from the context, never from the body.
 async function create(req, res) {
-  const row = await tenant(req.ctx).Warehouse.create(req.valid.body).catch(rethrowDuplicateCode);
+  const row = await warehouseService.createWarehouse(req.ctx, req.valid.body);
   res.status(201).json(toWarehouse(row));
 }
 
-// An archived warehouse is not found here (404): E3-03 lets it through for a restore only.
 async function update(req, res) {
-  const warehouse = await findOwned(req.ctx, "Warehouse", req.params.id);
-  if (warehouse.archivedAt) throw notFound();
-
-  await warehouse.update(req.valid.body).catch(rethrowDuplicateCode);
-  res.status(200).json(toWarehouse(warehouse));
+  const row = await warehouseService.updateWarehouse(req.ctx, req.params.id, req.valid.body);
+  res.status(200).json(toWarehouse(row));
 }
 
 module.exports = { list, show, create, update, toWarehouse };
