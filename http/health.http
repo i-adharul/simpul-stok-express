@@ -1,0 +1,10 @@
+### Health check (public, no token). Local server: cd server && npm run dev
+# Expect 200 {"status":"ok","app":{"commit":null},"database":{"status":"up","latencyMs":N}}
+# Expect the header Cache-Control: no-store and X-Request-Id.
+# The database result is cached inside the server: 60 s when up, 15 s when down,
+# so latencyMs repeats within a minute.
+GET http://localhost:3000/api/health
+
+### When the database is down (stop the local Postgres service first)
+# Expect 503 {"status":"error","app":{"commit":null},"database":{"status":"down"}}
+GET http://localhost:3000/api/health
