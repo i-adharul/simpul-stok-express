@@ -33,6 +33,9 @@ router.get(
   stockController.listMovements,
 );
 
+// No schema: a malformed ID is a 404 from the service, like every ID in a URL (rule 2).
+router.get("/stock/movements/:id", authentication, requireRole("history.read"), stockController.showMovement);
+
 router.post(
   "/stock/receive",
   authentication,

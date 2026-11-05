@@ -1,5 +1,7 @@
 const { Op } = require("sequelize");
 const { encodeCursor } = require("../helpers/cursor");
+const { notFound } = require("../helpers/errors");
+const { findOwned } = require("../helpers/ownership");
 const { tenant } = require("../helpers/tenantScope");
 
 // The stock history (BL16, S10): newest first, a page of 50, keyset pagination. Read-only.
@@ -63,4 +65,41 @@ async function listMovements(ctx, query) {
   return { items: page.map(toItem), nextCursor: rows.length > PAGE_SIZE ? encodeCursor(last) : null };
 }
 
-module.exports = { listMovements, PAGE_SIZE };
+// One movement with the names around it (S10, P13). Four situations are ONE 404: a malformed ID, a
+// missing one, another organization's (findOwned), and one in a warehouse outside the caller's
+// reach (ctx.warehouseIds), so the answer never says which. The related rows are read with
+// separate scoped queries, not an include (ADR 0011); the email of a user is never selected.
+async function getMovement(ctx, id) {
+  const movement = await findOwned(ctx, "StockMovement", id);
+  if (!ctx.warehouseIds.includes(movement.warehouseId)) throw notFound();
+
+  const scoped = tenant(ctx);
+  const [warehouse, product, createdBy, transfer] = await Promise.all([
+    scoped.Warehouse.findByPk(movement.warehouseId, { attributes: ["id", "code", "name"] }),
+    scoped.Product.findByPk(movement.productId, { attributes: ["id", "sku", "name", "unit"] }),
+    movement.createdById ? scoped.User.findByPk(movement.createdById, { attributes: ["id", "name", "role"] }) : null,
+    movement.transferId ? describeTransfer(ctx, movement.transferId) : null,
+  ]);
+
+  return {
+    ...toItem(movement),
+    warehouse: { id: warehouse.id, code: warehouse.code, name: warehouse.name },
+    product: { id: product.id, sku: product.sku, name: product.name, unit: product.unit },
+    createdBy: createdBy ? { id: createdBy.id, name: createdBy.name, role: createdBy.role } : null,
+    transfer,
+  };
+}
+
+// The transfer behind a TRANSFER_OUT or TRANSFER_IN movement, with the names of both warehouses.
+async function describeTransfer(ctx, transferId) {
+  const scoped = tenant(ctx);
+  const transfer = await scoped.StockTransfer.findByPk(transferId, { attributes: ["id", "code", "fromWarehouseId", "toWarehouseId"] });
+  if (!transfer) return null;
+  const [from, to] = await Promise.all([
+    scoped.Warehouse.findByPk(transfer.fromWarehouseId, { attributes: ["id", "name"] }),
+    scoped.Warehouse.findByPk(transfer.toWarehouseId, { attributes: ["id", "name"] }),
+  ]);
+  return { id: transfer.id, code: transfer.code, fromWarehouse: { id: from.id, name: from.name }, toWarehouse: { id: to.id, name: to.name } };
+}
+
+module.exports = { listMovements, getMovement, PAGE_SIZE };

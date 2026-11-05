@@ -53,6 +53,21 @@ const product = {
   countRows: rawCount("Products"),
 };
 
+// A movement written by raw SQL (a RECEIVE in a new warehouse of the organization).
+const movement = {
+  createRow: async (world, organization) => {
+    const warehouseId = await world.createWarehouse(organization);
+    const productId = await world.createProduct(organization);
+    const [rows] = await getSequelize().query(
+      `INSERT INTO "StockMovements" ("organizationId", "warehouseId", "productId", "quantityDelta", "type")
+       VALUES (:organizationId, :warehouseId, :productId, 5, 'RECEIVE') RETURNING "id"`,
+      { replacements: { organizationId: world.organizations[organization], warehouseId, productId } },
+    );
+    return { id: rows[0].id };
+  },
+  readRow: rawRow("StockMovements"),
+};
+
 // A stock write needs a warehouse and a product of the caller's organization that exist first.
 const stockBody = async (world, patch = {}) => ({
   warehouseId: await world.createWarehouse("A"),
@@ -135,18 +150,11 @@ const TENANT_ENDPOINTS = [
     kind: "list",
     action: "history.read",
     supportsCursor: true,
-    createRow: async (world, organization) => {
-      const warehouseId = await world.createWarehouse(organization);
-      const productId = await world.createProduct(organization);
-      const [rows] = await getSequelize().query(
-        `INSERT INTO "StockMovements" ("organizationId", "warehouseId", "productId", "quantityDelta", "type")
-         VALUES (:organizationId, :warehouseId, :productId, 5, 'RECEIVE') RETURNING "id"`,
-        { replacements: { organizationId: world.organizations[organization], warehouseId, productId } },
-      );
-      return { id: rows[0].id };
-    },
-    readRow: rawRow("StockMovements"),
+    ...movement,
   },
+  // One movement (E4-08): another organization's id, a missing one, a malformed one and one in a
+  // warehouse out of reach are the same 404. No warehouseScoped: that case is a 404, not a 403.
+  { method: "get", path: "/api/stock/movements/:id", kind: "item", action: "history.read", ...movement },
   // Stock receipt (E4-02). The row the endpoint creates is a movement; the warehouse is what a
   // foreign key must be tried on, so `createRow` makes a warehouse (the default for foreignBodies).
   {
