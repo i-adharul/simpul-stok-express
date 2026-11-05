@@ -34,8 +34,14 @@ function buildFakeApp(flaws = {}) {
         next();
       }
     : authentication;
-  // Flaw "noRoleCheck": the route forgets the role check.
-  const guard = (action) => (flaws.noRoleCheck ? (req, res, next) => next() : requireCan(action));
+  // Flaw "noRoleCheck": the route forgets the role check. Flaw "refusesViewerRead": it refuses a
+  // Viewer a read that the matrix allows.
+  const guard = (action) => {
+    if (flaws.noRoleCheck) return (req, res, next) => next();
+    const check = requireCan(action);
+    if (!flaws.refusesViewerRead || action !== "warehouse.read") return check;
+    return (req, res, next) => (req.ctx.role === "VIEWER" ? next(forbidden()) : check(req, res, next));
+  };
 
   // Own row, or the same 404 as for a missing row. Flaw "foreign403" answers 403 for another
   // organization's row, which tells the caller that the row exists.
