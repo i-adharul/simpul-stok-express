@@ -196,3 +196,94 @@ describe("BL01: an expired token is rejected", () => {
     expectSessionEnded(await me(token));
   });
 });
+
+describe("BL01: a token issued before a password change is rejected", () => {
+  const NEW = "Kopi-Susu-2027";
+
+  it("changing the password through the API ends the old session and starts a new one", async () => {
+    const account = await createAccount();
+    const oldToken = await login(account);
+    expect((await me(oldToken)).status).toBe(200);
+    // The comparison is in whole seconds: the old token must be at least a second older.
+    await sleep(1100);
+
+    const change = await changePassword(oldToken, {
+      currentPassword: account.password,
+      newPassword: NEW,
+    });
+
+    expect(change.status).toBe(200);
+    expectSessionEnded(await me(oldToken));
+    expect((await me(change.body.token)).status).toBe(200);
+  });
+
+  it("a session on another device ends too", async () => {
+    const account = await createAccount();
+    const phone = await login(account);
+    const laptop = await login(account);
+    await sleep(1100);
+
+    const change = await changePassword(laptop, { currentPassword: account.password, newPassword: NEW });
+
+    expect(change.status).toBe(200);
+    expectSessionEnded(await me(phone));
+    expectSessionEnded(await me(laptop));
+    expect((await me(change.body.token)).status).toBe(200);
+  });
+
+  it("a change made directly in the database (a reset) ends older sessions as well", async () => {
+    const account = await createAccount();
+    const token = await login(account);
+    await sleep(1100);
+
+    await getSequelize().query('UPDATE "Users" SET "passwordChangedAt" = now()');
+
+    expectSessionEnded(await me(token));
+  });
+
+  it("a token issued after the change keeps working", async () => {
+    const account = await createAccount();
+    await getSequelize().query(`UPDATE "Users" SET "passwordChangedAt" = now() - interval '1 hour'`);
+
+    const token = await login(account);
+
+    expect((await me(token)).status).toBe(200);
+  });
+
+  it("the old password no longer logs in, the new one does", async () => {
+    const account = await createAccount();
+    await changePassword(await login(account), { currentPassword: account.password, newPassword: NEW });
+
+    const oldLogin = await request(app)
+      .post("/api/auth/login")
+      .send({ email: account.email, password: account.password });
+    const newLogin = await request(app).post("/api/auth/login").send({ email: account.email, password: NEW });
+
+    expect(oldLogin.status).toBe(401);
+    expect(newLogin.status).toBe(200);
+  });
+
+  it("a wrong current password changes nothing: the session stays valid", async () => {
+    const account = await createAccount();
+    const token = await login(account);
+    await sleep(1100);
+
+    const change = await changePassword(token, { currentPassword: "Salah-Banget-1", newPassword: NEW });
+
+    expect(change.status).toBe(400);
+    expect((await me(token)).status).toBe(200);
+  });
+
+  it("known limit: a token issued in the same second as the change still works", async () => {
+    // Documented in docs/04 (Authentication) and in middlewares/authentication.js. If this test
+    // starts failing, the rule became stricter; update the documents together with the test.
+    const account = await createAccount();
+    const nowSecond = Math.floor(Date.now() / 1000);
+    const token = jwt.sign({ iat: nowSecond }, env.JWT_SECRET, { subject: account.id, expiresIn: "8h" });
+    await getSequelize().query('UPDATE "Users" SET "passwordChangedAt" = :at', {
+      replacements: { at: new Date(nowSecond * 1000 + 999) },
+    });
+
+    expect((await me(token)).status).toBe(200);
+  });
+});
