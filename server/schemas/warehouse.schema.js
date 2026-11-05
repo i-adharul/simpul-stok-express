@@ -34,6 +34,8 @@ const updateWarehouseSchema = z
   })
   .refine((body) => Object.keys(body).length > 0, {
     message: "Minimal satu field wajib diisi.",
+    // Not when another issue was found already (an unknown key): one clear message is enough.
+    when: (payload) => payload.issues.length === 0,
   });
 
 module.exports = {
