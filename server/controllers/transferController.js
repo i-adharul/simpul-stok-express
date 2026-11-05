@@ -30,4 +30,10 @@ async function create(req, res) {
   res.status(201).json(body);
 }
 
-module.exports = { create };
+// No input schema: the only input is the ID, and a malformed ID must be 404, not 400 (rule 2). The
+// role was checked by the route; the service limits the answer to the caller's warehouses.
+async function show(req, res) {
+  res.status(200).json(await transferService.getTransferDetail(req.ctx, req.params.id));
+}
+
+module.exports = { create, show };

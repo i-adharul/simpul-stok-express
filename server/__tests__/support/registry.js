@@ -68,6 +68,33 @@ const movement = {
   readRow: rawRow("StockMovements"),
 };
 
+// A transfer written by raw SQL: two warehouses of the organization, one product, the header and
+// its TRANSFER_OUT and TRANSFER_IN movements (the code is random, the real numbering is not needed).
+const transfer = {
+  createRow: async (world, organization) => {
+    const organizationId = world.organizations[organization];
+    const fromWarehouseId = await world.createWarehouse(organization);
+    const toWarehouseId = await world.createWarehouse(organization);
+    const productId = await world.createProduct(organization);
+    const sequelize = getSequelize();
+    const [rows] = await sequelize.query(
+      `INSERT INTO "StockTransfers" ("organizationId", "code", "fromWarehouseId", "toWarehouseId")
+       VALUES (:organizationId, :code, :fromWarehouseId, :toWarehouseId) RETURNING "id"`,
+      { replacements: { organizationId, code: `MT-${Math.random().toString(36).slice(2, 10)}`, fromWarehouseId, toWarehouseId } },
+    );
+    const id = rows[0].id;
+    for (const [type, warehouseId, quantityDelta] of [["TRANSFER_OUT", fromWarehouseId, -2], ["TRANSFER_IN", toWarehouseId, 2]]) {
+      await sequelize.query(
+        `INSERT INTO "StockMovements" ("organizationId", "warehouseId", "productId", "quantityDelta", "type", "transferId")
+         VALUES (:organizationId, :warehouseId, :productId, :quantityDelta, :type, :id)`,
+        { replacements: { organizationId, warehouseId, productId, quantityDelta, type, id } },
+      );
+    }
+    return { id };
+  },
+  readRow: rawRow("StockTransfers"),
+};
+
 // A stock write needs a warehouse and a product of the caller's organization that exist first.
 const stockBody = async (world, patch = {}) => ({
   warehouseId: await world.createWarehouse("A"),
@@ -249,6 +276,9 @@ const TENANT_ENDPOINTS = [
     readRow: rawRow("StockTransfers"),
     countRows: rawCount("StockTransfers"),
   },
+  // One transfer (E5-05): another organization's id, a missing one, a malformed one and one whose
+  // warehouses are out of reach are the same 404. No warehouseScoped: that case is a 404, not a 403.
+  { method: "get", path: "/api/stock/transfers/:id", kind: "item", action: "history.read", ...transfer },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", listQuery: { pageSize: 100 }, ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
   {
