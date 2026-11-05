@@ -33,4 +33,18 @@ const findUserById = (id) =>
     ],
   });
 
-module.exports = { findUserByEmail, touchLastLogin, findUserById };
+// Only the password flows need the hash, so it has its own reader instead of widening findUserById.
+const findUserWithPasswordHash = (id) =>
+  User.findByPk(id, { attributes: ["id", "email", "passwordHash"] });
+
+// `changedAt` is set by the caller so the new token can be issued at or after the same instant.
+const savePassword = (userId, passwordHash, changedAt) =>
+  User.update({ passwordHash, passwordChangedAt: changedAt }, { where: { id: userId } });
+
+module.exports = {
+  findUserByEmail,
+  touchLastLogin,
+  findUserById,
+  findUserWithPasswordHash,
+  savePassword,
+};
