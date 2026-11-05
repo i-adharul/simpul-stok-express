@@ -26,6 +26,20 @@ const createUser = (
     { organizationId, email, role },
   );
 
+const createWarehouse = (organizationId, code = "GD-1", archivedAt = null) =>
+  insertReturningId(
+    `INSERT INTO "Warehouses" ("organizationId", "code", "name", "archivedAt")
+     VALUES (:organizationId, :code, :code, :archivedAt)`,
+    { organizationId, code, archivedAt },
+  );
+
+const assignWarehouse = (organizationId, userId, warehouseId) =>
+  insertReturningId(
+    `INSERT INTO "UserWarehouses" ("organizationId", "userId", "warehouseId")
+     VALUES (:organizationId, :userId, :warehouseId)`,
+    { organizationId, userId, warehouseId },
+  );
+
 const createPlan = (name = "Starter") =>
   insertReturningId(
     `INSERT INTO "Plans" ("name", "priceIdr", "maxWarehouses", "maxProducts", "maxMembers")
@@ -44,6 +58,8 @@ module.exports = {
   insertReturningId,
   createOrganization,
   createUser,
+  createWarehouse,
+  assignWarehouse,
   createPlan,
   createSubscription,
 };

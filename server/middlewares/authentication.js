@@ -1,5 +1,6 @@
 const { unauthenticated } = require("../helpers/errors");
 const { verifyToken } = require("../helpers/jwt");
+const { buildContext } = require("../helpers/requestContext");
 const { findUserById } = require("../helpers/userAccess");
 
 const BEARER = /^Bearer ([^\s]+)$/i;
@@ -47,8 +48,10 @@ async function authentication(req, res, next) {
     return next(unauthenticated());
   }
 
-  // E2-03 builds req.ctx from this; until then handlers read req.user.
+  // req.ctx is what every lower layer receives (organizationId comes from here and nowhere else).
+  // req.user stays for the /me handlers that need the profile and the organization record.
   req.user = user.get({ plain: true });
+  req.ctx = await buildContext(req.user);
   return next();
 }
 
