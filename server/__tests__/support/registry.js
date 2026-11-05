@@ -87,6 +87,14 @@ const TENANT_ENDPOINTS = [
     body: () => ({ sku: `NEW-${Math.random().toString(36).slice(2, 10)}`, name: "Produk Baru", unit: "pcs" }),
     ...product,
   },
+  {
+    method: "patch",
+    path: "/api/products/:id",
+    kind: "item",
+    action: "product.manage",
+    body: () => ({ name: "Nama Baru" }),
+    ...product,
+  },
 ];
 
 const METHODS = ["get", "post", "put", "patch", "delete"];

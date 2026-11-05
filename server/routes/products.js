@@ -5,7 +5,7 @@ const { requireCan } = require("../middlewares/authorization");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { createProductSchema, productListQuerySchema } = require("../schemas/product.schema");
+const { createProductSchema, productListQuerySchema, updateProductSchema } = require("../schemas/product.schema");
 
 const router = express.Router();
 
@@ -31,6 +31,15 @@ router.post(
   subscriptionGuard,
   validate({ body: createProductSchema }),
   productController.create,
+);
+
+router.patch(
+  "/products/:id",
+  authentication,
+  requireCan("product.manage"),
+  subscriptionGuard,
+  validate({ body: updateProductSchema }),
+  productController.update,
 );
 
 module.exports = router;

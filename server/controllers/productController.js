@@ -58,4 +58,13 @@ async function create(req, res) {
   res.status(201).json(toProduct(row));
 }
 
-module.exports = { list, show, create, toProduct };
+// An archived product is not found here (404): E3-06 lets it through for a restore only.
+async function update(req, res) {
+  const product = await findOwned(req.ctx, "Product", req.params.id);
+  if (product.archivedAt) throw notFound();
+
+  await product.update(req.valid.body).catch(rethrowDuplicateSku);
+  res.status(200).json(toProduct(product));
+}
+
+module.exports = { list, show, create, update, toProduct };

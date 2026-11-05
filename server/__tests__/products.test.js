@@ -225,3 +225,101 @@ describe("POST /api/products", () => {
     expect(await productRows(orgA())).toHaveLength(0);
   });
 });
+
+describe("PATCH /api/products/:id", () => {
+  const readProduct = async (id) => (await sql(`SELECT * FROM "Products" WHERE "id" = :id`, { id }))[0];
+
+  it("updates sku, name, unit and minStock with the same rules as POST", async () => {
+    const id = await world.createProduct("A", "SKU-1");
+
+    const res = await send("patch", `/api/products/${id}`, { sku: " sku 2 ", name: " Baru ", unit: "ktk", minStock: 7 });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id, sku: "SKU2", name: "Baru", unit: "ktk", minStock: 7, organizationId: orgA() });
+    expect(await readProduct(id)).toMatchObject({ sku: "SKU2", name: "Baru", unit: "ktk", minStock: 7 });
+  });
+
+  it("changes only the fields that were sent (minStock 0 is a value, not 'missing')", async () => {
+    const id = await world.createProduct("A", "SKU-1");
+    await sql(`UPDATE "Products" SET "minStock" = 9 WHERE "id" = :id`, { id });
+
+    const renamed = await send("patch", `/api/products/${id}`, { name: "Nama Baru" });
+    expect(renamed.body).toMatchObject({ sku: "SKU-1", name: "Nama Baru", minStock: 9 });
+
+    const zero = await send("patch", `/api/products/${id}`, { minStock: 0 });
+    expect(zero.body).toMatchObject({ name: "Nama Baru", minStock: 0 });
+  });
+
+  it("answers 409 when the SKU belongs to another product of the organization", async () => {
+    await world.createProduct("A", "SKU-1");
+    const id = await world.createProduct("A", "SKU-2");
+
+    const res = await send("patch", `/api/products/${id}`, { sku: "sku-1" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ code: "CONFLICT", message: "SKU sudah dipakai.", details: null });
+    expect((await readProduct(id)).sku).toBe("SKU-2");
+  });
+
+  it("accepts the product's own SKU again and a SKU used in another organization", async () => {
+    await world.createProduct("B", "SKU-X");
+    const id = await world.createProduct("A", "SKU-1");
+
+    expect((await send("patch", `/api/products/${id}`, { sku: "SKU-1" })).status).toBe(200);
+    expect((await send("patch", `/api/products/${id}`, { sku: "SKU-X" })).status).toBe(200);
+  });
+
+  it("answers the same 404 for another organization's product, a missing ID and a malformed ID, and changes nothing", async () => {
+    const foreign = await world.createProduct("B", "SKU-B");
+
+    const answers = [
+      await send("patch", `/api/products/${foreign}`, { name: "Dibajak" }),
+      await send("patch", "/api/products/33333333-3333-4333-8333-333333333333", { name: "Dibajak" }),
+      await send("patch", "/api/products/not-a-uuid", { name: "Dibajak" }),
+    ];
+
+    for (const res of answers) expect(res.status).toBe(404);
+    expect(new Set(answers.map((r) => r.text)).size).toBe(1);
+    expect((await readProduct(foreign)).name).not.toBe("Dibajak");
+  });
+
+  it.each([
+    [{}],
+    [{ organizationId: "x" }],
+    [{ archived: true }],
+    [{ name: "" }],
+    [{ unit: "kg" }],
+    [{ minStock: -1 }],
+    [{ minStock: 2.5 }],
+  ])("answers 400 for %j", async (body) => {
+    const id = await world.createProduct("A", "SKU-1");
+
+    const res = await send("patch", `/api/products/${id}`, body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("does not move the product to another organization", async () => {
+    const id = await world.createProduct("A");
+
+    await send("patch", `/api/products/${id}`, { name: "X", organizationId: world.organizations.B });
+
+    expect((await readProduct(id)).organizationId).toBe(orgA());
+  });
+
+  it("answers 404 for an archived product (it can only be restored, delivered in E3-06)", async () => {
+    const id = await archivedProduct("SKU-OLD");
+
+    expect((await send("patch", `/api/products/${id}`, { name: "X" })).status).toBe(404);
+  });
+
+  it.each(["WAREHOUSE_ADMIN", "VIEWER"])("answers 403 to a %s, also for another organization's ID", async (role) => {
+    const own = await world.createProduct("A");
+    const foreign = await world.createProduct("B");
+
+    expect((await send("patch", `/api/products/${own}`, { name: "X" }, role)).status).toBe(403);
+    expect((await send("patch", `/api/products/${foreign}`, { name: "X" }, role)).status).toBe(403);
+    expect((await readProduct(own)).name).not.toBe("X");
+  });
+});
