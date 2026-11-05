@@ -3,6 +3,7 @@ import BaseLayout from './layouts/BaseLayout'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
 import LoadingSkeleton from './components/LoadingSkeleton'
+import { formatDateTime, formatNumber } from './utils/format'
 
 // Temporary user until E1-04 adds AuthContext (login and session).
 const PLACEHOLDER_USER = { name: 'Pengguna Contoh', role: 'OWNER', organizationName: 'Organisasi Contoh' }
@@ -16,6 +17,9 @@ function StatesPreview() {
   return (
     <div className="space-y-6">
       <Placeholder title="Dashboard" />
+      <p>
+        Contoh format: {formatDateTime('2026-11-05T17:00:00Z')} dan {formatNumber(1234567.5)}
+      </p>
       <LoadingSkeleton rows={3} />
       <EmptyState message="Belum ada gudang." actionLabel="Tambah gudang" />
       <ErrorState onRetry={() => {}} />
