@@ -20,6 +20,7 @@ describe("models/index.js", () => {
       "Organization",
       "Plan",
       "Product",
+      "StockLevel",
       "Subscription",
       "User",
       "UserWarehouse",
@@ -67,6 +68,15 @@ describe("models/index.js", () => {
     );
     expect(db.Organization.associations.Products.associationType).toBe(
       "HasMany",
+    );
+  });
+
+  it("links a stock level to its warehouse and product", () => {
+    expect(db.StockLevel.associations.Warehouse.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.StockLevel.associations.Product.associationType).toBe(
+      "BelongsTo",
     );
   });
 });
