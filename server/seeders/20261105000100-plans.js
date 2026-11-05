@@ -1,5 +1,7 @@
 "use strict";
 
+const { assertSeedAllowed } = require("../helpers/seedGuard");
+
 // Prices are examples (docs/02_Functional_Spec.md, design decision "Plans").
 // A plan differs from another only in its limits, not in features.
 const PLANS = [
@@ -22,6 +24,7 @@ const PLANS = [
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface) {
+    assertSeedAllowed(queryInterface.sequelize);
     for (const plan of PLANS) {
       // ON CONFLICT makes a second run harmless and never overwrites a price changed by hand.
       await queryInterface.sequelize.query(
@@ -34,6 +37,7 @@ module.exports = {
   },
 
   async down(queryInterface) {
+    assertSeedAllowed(queryInterface.sequelize);
     // Fails on purpose while a subscription still points to a plan (foreign key RESTRICT).
     await queryInterface.sequelize.query(
       'DELETE FROM "Plans" WHERE "name" IN (:names)',

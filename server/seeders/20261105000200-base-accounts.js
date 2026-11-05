@@ -1,9 +1,11 @@
 "use strict";
 
+const { assertSeedAllowed } = require("../helpers/seedGuard");
+
 const bcrypt = require("bcryptjs");
 
 // A local demo password, shared by every seeded account. It is public on purpose, which is why
-// the seed refuses to run against a remote database (see the guard added in the next step).
+// the seeders refuse to run against a remote database (helpers/seedGuard.js).
 const DEMO_PASSWORD = "Simpul-Demo-2026";
 const BCRYPT_COST = 12; // CLAUDE.md / docs/05: bcryptjs, cost 12.
 
@@ -94,6 +96,7 @@ async function insertAccount(
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface) {
+    assertSeedAllowed(queryInterface.sequelize);
     const organizationId = await insertOrganization(queryInterface);
     await insertTrialSubscription(queryInterface, organizationId);
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_COST);
@@ -108,6 +111,7 @@ module.exports = {
   },
 
   async down(queryInterface) {
+    assertSeedAllowed(queryInterface.sequelize);
     const organizationId = await findId(
       queryInterface,
       "Organizations",

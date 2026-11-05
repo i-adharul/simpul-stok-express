@@ -75,4 +75,25 @@ describe("parseEnv", () => {
       }),
     );
   });
+
+  describe("SEED_ALLOW_REMOTE", () => {
+    it("is false when it is not set", () => {
+      expect(parseEnv(valid).SEED_ALLOW_REMOTE).toBe(false);
+    });
+
+    it.each([
+      ["true", true],
+      ["false", false],
+    ])("turns %s into a boolean", (value, expected) => {
+      expect(
+        parseEnv({ ...valid, SEED_ALLOW_REMOTE: value }).SEED_ALLOW_REMOTE,
+      ).toBe(expected);
+    });
+
+    it.each(["yes", "1", "TRUE"])("rejects %s", (value) => {
+      expect(() => parseEnv({ ...valid, SEED_ALLOW_REMOTE: value })).toThrow(
+        "SEED_ALLOW_REMOTE",
+      );
+    });
+  });
 });

@@ -19,6 +19,11 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().min(1),
   CORS_ORIGIN: origins,
+  // Lets the seed run against a non-local database (helpers/seedGuard.js). Off unless set.
+  SEED_ALLOW_REMOTE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
 // Pure on purpose: takes any object, so tests do not touch process.env.
