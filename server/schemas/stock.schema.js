@@ -83,4 +83,4 @@ const movementListQuerySchema = z.object({
     .optional(),
 });
 
-module.exports = { receiveSchema, adjustSchema, stockListQuerySchema, movementListQuerySchema, REASONS };
+module.exports = { receiveSchema, adjustSchema, stockListQuerySchema, movementListQuerySchema, REASONS, id, note };
