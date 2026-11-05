@@ -1,3 +1,6 @@
+const { UniqueConstraintError } = require("sequelize");
+const { conflict } = require("../helpers/errors");
+const { inSavepoint } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
 
 // The document number of a transfer: MT-0001, MT-0002, ... sequential per organization (BL13).
@@ -24,4 +27,35 @@ async function nextTransferCode(ctx, transaction) {
   return formatTransferCode(existing + 1);
 }
 
-module.exports = { CODE_PREFIX, formatTransferCode, nextTransferCode };
+// The retry rules (BL13): after a collision the call is repeated with a fresh count, at most 5
+// times, each time after a random pause of up to 30 ms so two colliding transfers do not collide
+// again in step. Then the answer is a 409 the client may simply send again.
+const MAX_CODE_RETRIES = 5;
+const MAX_DELAY_MS = 30;
+const CODE_CONSTRAINT = "StockTransfers_organizationId_code_key";
+const TOO_MANY = "Terlalu banyak mutasi bersamaan, coba lagi.";
+
+const randomDelay = () => new Promise((resolve) => setTimeout(resolve, Math.random() * MAX_DELAY_MS));
+
+// Only a break of the (organizationId, code) unique index is a collision. Any other error (a
+// foreign key, a CHECK, a lost connection) is a real failure and is thrown unchanged.
+const isCodeCollision = (error) => error instanceof UniqueConstraintError && error.parent?.constraint === CODE_CONSTRAINT;
+
+// Inserts the StockTransfer row with the next code. ONLY this insert sits inside a savepoint: a
+// collision rolls back to the savepoint, so the warehouse locks, the stock changes already made and
+// the rest of the transaction survive, and just the insert is tried again. `wait` is a parameter so
+// a test can count the pauses instead of sleeping.
+async function createWithCode(ctx, values, transaction, { wait = randomDelay, maxRetries = MAX_CODE_RETRIES } = {}) {
+  for (let attempt = 0; ; attempt += 1) {
+    const code = await nextTransferCode(ctx, transaction);
+    try {
+      return await inSavepoint(transaction, (savepoint) => tenant(ctx).StockTransfer.create({ ...values, code }, { transaction: savepoint }));
+    } catch (error) {
+      if (!isCodeCollision(error)) throw error;
+      if (attempt >= maxRetries) throw conflict(TOO_MANY);
+      await wait();
+    }
+  }
+}
+
+module.exports = { CODE_PREFIX, MAX_CODE_RETRIES, MAX_DELAY_MS, formatTransferCode, nextTransferCode, createWithCode };
