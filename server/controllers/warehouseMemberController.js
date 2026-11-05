@@ -5,4 +5,9 @@ async function list(req, res) {
   res.status(200).json(await warehouseMemberService.getMembers(req.ctx, req.params.id));
 }
 
-module.exports = { list };
+// The new set of users comes from the validated body; the answer has the shape of the GET.
+async function replace(req, res) {
+  res.status(200).json(await warehouseMemberService.replaceMembers(req.ctx, req.params.id, req.valid.body.userIds));
+}
+
+module.exports = { list, replace };

@@ -6,6 +6,7 @@ const { requireCan } = require("../middlewares/authorization");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
+const { replaceMembersSchema } = require("../schemas/warehouseMember.schema");
 const { createWarehouseSchema,
   updateWarehouseSchema,
   warehouseListQuerySchema } = require("../schemas/warehouse.schema");
@@ -54,6 +55,15 @@ router.get(
   authentication,
   requireCan("member.manage"),
   warehouseMemberController.list,
+);
+
+router.put(
+  "/warehouses/:id/members",
+  authentication,
+  requireCan("member.manage"),
+  subscriptionGuard,
+  validate({ body: replaceMembersSchema }),
+  warehouseMemberController.replace,
 );
 
 module.exports = router;
