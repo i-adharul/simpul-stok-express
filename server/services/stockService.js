@@ -1,4 +1,4 @@
-const { conflict, forbidden } = require("../helpers/errors");
+const { conflict, forbidden, validationError } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { tenant } = require("../helpers/tenantScope");
 const { lockWarehouse } = require("./warehouseLock");
@@ -57,4 +57,46 @@ async function receive(ctx, { warehouseId, productId, quantity, note }, transact
   return movement.id;
 }
 
-module.exports = { receive, MAX_QUANTITY };
+// BL12. The target is the counted quantity (SET) or the current quantity plus a difference (DELTA).
+// Unlike a receipt, an archived product may be adjusted (leftover stock must be zeroable).
+async function resolveTarget(mode, value, current) {
+  const target = mode === "SET" ? value : current + value;
+  if (target === current) {
+    throw validationError([{ source: "body", path: "value", message: `Stok baru sama dengan stok saat ini (${current}).` }]);
+  }
+  if (target < 0) throw conflict("Stok hasil penyesuaian tidak boleh kurang dari 0.");
+  if (target > MAX_QUANTITY) throw conflict("Stok melebihi batas yang dapat disimpan.");
+  return target;
+}
+
+// Writes the new quantity as a compare-and-set: the row changes only while it still holds the
+// quantity that was read (rule 8), and the affected-row count is checked. With the warehouse lock
+// held nothing should change it, so a count of 0 means something bypassed the lock; the answer is a
+// 409 the client can retry. The CHECK (quantity >= 0) in the database stays the last safety net.
+async function writeLevel(ctx, level, { warehouseId, productId, target }, transaction) {
+  const levels = tenant(ctx).StockLevel;
+  if (!level) {
+    await levels.create({ warehouseId, productId, quantity: target }, { transaction });
+    return;
+  }
+  const [changed] = await levels.update({ quantity: target }, { where: { id: level.id, quantity: level.quantity }, transaction });
+  if (changed !== 1) throw conflict("Stok berubah saat disesuaikan. Coba lagi.");
+}
+
+// BL12: lock the warehouse, check warehouse and product, read the quantity, write the new one with a
+// conditional update, write the ADJUST movement holding the signed difference. Returns the movement ID.
+async function adjust(ctx, { warehouseId, productId, mode, value, reason, note }, transaction) {
+  await lockActiveWarehouse(ctx, warehouseId, transaction);
+  const product = await findOwned(ctx, "Product", productId, { transaction });
+  const level = await tenant(ctx).StockLevel.findOne({ where: { warehouseId, productId: product.id }, transaction });
+  const current = level ? level.quantity : 0;
+  const target = await resolveTarget(mode, value, current);
+  await writeLevel(ctx, level, { warehouseId, productId: product.id, target }, transaction);
+  const movement = await tenant(ctx).StockMovement.create(
+    { warehouseId, productId: product.id, quantityDelta: target - current, type: "ADJUST", reason, note: note ?? null, createdById: ctx.userId },
+    { transaction },
+  );
+  return movement.id;
+}
+
+module.exports = { receive, adjust, MAX_QUANTITY };

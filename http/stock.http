@@ -30,3 +30,18 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "warehouseId": "{{warehouseId}}", "productId": "{{productId}}", "quantity": 1 }
+
+### Adjust stock (Owner, or Warehouse Admin of an assigned warehouse)
+# mode SET: "value" is the counted quantity (0..1000000). mode DELTA: "value" is a non-zero difference (-1000000..1000000).
+# reason: STOCK_OPNAME, DAMAGED, LOST or CORRECTION (required). note: optional, at most 255 characters.
+# Expect 201 { id, warehouseId, productId, quantity (the SIGNED change), createdAt, reason }. A repeated Idempotency-Key gives
+# the same body plus Idempotency-Replayed: true.
+# 400: a new quantity equal to the current one ("Stok baru sama dengan stok saat ini (n)."), or bad input.
+# 403 (one body): a Viewer, or an unassigned, archived, foreign or missing warehouse. 404: a foreign or missing product.
+# 409: the result would be below 0 or above 2147483647; the warehouse was archived meanwhile; "Stok berubah saat disesuaikan. Coba lagi."
+POST {{baseUrl}}/api/stock/adjust
+Authorization: Bearer {{token}}
+Idempotency-Key: 0c9b6f2e-5d77-4b0a-8c1e-2a6d93f1b7a4
+Content-Type: application/json
+
+{ "warehouseId": "{{warehouseId}}", "productId": "{{productId}}", "mode": "SET", "value": 40, "reason": "STOCK_OPNAME", "note": "Hitung ulang rak A" }

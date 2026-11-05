@@ -128,7 +128,7 @@ async function checkList(app, entry, world) {
   const own = await entry.createRow(world, "A");
   const foreign = await entry.createRow(world, "B");
 
-  const res = await send(app, entry, { authorization: user.authorization });
+  const res = await send(app, entry, { authorization: user.authorization, query: entry.listQuery });
   const failures = expectStatus(entry, "list", res, 200);
   if (!res.text.includes(own.id)) failures.push(fail(entry, "the list does not contain A's own row"));
   if (res.text.includes(foreign.id)) failures.push(fail(entry, "the list contains a row of B"));

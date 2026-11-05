@@ -20,4 +20,28 @@ const receiveSchema = z.object({
   note: note.optional(),
 });
 
-module.exports = { receiveSchema };
+// BL12. One flat object (so validate() makes it strict and rejects unknown keys, `organizationId`
+// included), with the rule that depends on `mode` checked in superRefine: SET is the counted
+// quantity (0 to 1,000,000), DELTA a non-zero difference (-1,000,000 to 1,000,000). `reason` is an
+// enum, so it needs no minimum length.
+const REASONS = ["STOCK_OPNAME", "DAMAGED", "LOST", "CORRECTION"];
+
+const adjustSchema = z
+  .object({
+    warehouseId: id,
+    productId: id,
+    mode: z.enum(["SET", "DELTA"]),
+    value: z.int().min(-1000000).max(1000000),
+    reason: z.enum(REASONS),
+    note: note.optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (body.mode === "SET" && body.value < 0) {
+      ctx.addIssue({ code: "custom", path: ["value"], message: "Stok baru tidak boleh kurang dari 0." });
+    }
+    if (body.mode === "DELTA" && body.value === 0) {
+      ctx.addIssue({ code: "custom", path: ["value"], message: "Selisih tidak boleh 0." });
+    }
+  });
+
+module.exports = { receiveSchema, adjustSchema, REASONS };

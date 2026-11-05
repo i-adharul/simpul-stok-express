@@ -6,7 +6,7 @@ const idempotencyKey = require("../middlewares/idempotencyKey");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { receiveSchema } = require("../schemas/stock.schema");
+const { receiveSchema, adjustSchema } = require("../schemas/stock.schema");
 
 const router = express.Router();
 
@@ -23,6 +23,16 @@ router.post(
   idempotencyKey,
   validate({ body: receiveSchema }),
   stockController.receive,
+);
+
+router.post(
+  "/stock/adjust",
+  authentication,
+  requireRole("stock.adjust"),
+  subscriptionGuard,
+  idempotencyKey,
+  validate({ body: adjustSchema }),
+  stockController.adjust,
 );
 
 module.exports = router;
