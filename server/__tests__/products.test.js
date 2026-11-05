@@ -135,3 +135,93 @@ describe("GET /api/products/:id", () => {
     expect(admin.status).toBe(403);
   });
 });
+
+const send = (method, url, body, role = "OWNER") => request(app)[method](url).set("Authorization", as(role)).send(body);
+const productRows = (organizationId) =>
+  sql(`SELECT * FROM "Products" WHERE "organizationId" = :organizationId ORDER BY "sku"`, { organizationId });
+
+describe("POST /api/products", () => {
+  it("creates a product in the caller's organization: SKU without spaces and uppercase, minStock 0 by default", async () => {
+    const res = await send("post", "/api/products", { sku: " ab 12-c ", name: " Teh Botol ", unit: "btl" });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      organizationId: orgA(),
+      sku: "AB12-C",
+      name: "Teh Botol",
+      unit: "btl",
+      minStock: 0,
+      archivedAt: null,
+    });
+    const rows = await productRows(orgA());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ sku: "AB12-C", unit: "btl", minStock: 0 });
+  });
+
+  it("stores the given minStock", async () => {
+    const res = await send("post", "/api/products", { sku: "A", name: "A", unit: "pak", minStock: 25 });
+
+    expect(res.body.minStock).toBe(25);
+  });
+
+  it("answers 409 CONFLICT for a SKU that exists in the organization, however it is written", async () => {
+    await send("post", "/api/products", { sku: "SKU-1", name: "Satu", unit: "pcs" });
+
+    const res = await send("post", "/api/products", { sku: " sku -1", name: "Dua", unit: "pcs" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ code: "CONFLICT", message: "SKU sudah dipakai.", details: null });
+    expect(await productRows(orgA())).toHaveLength(1);
+  });
+
+  it("allows the same SKU in another organization", async () => {
+    await world.createProduct("B", "SKU-1");
+
+    expect((await send("post", "/api/products", { sku: "SKU-1", name: "Satu", unit: "pcs" })).status).toBe(201);
+  });
+
+  it("lets only one of simultaneous requests for the same SKU win", async () => {
+    const results = await Promise.all(
+      [1, 2, 3].map((n) => send("post", "/api/products", { sku: "RACE", name: `Produk ${n}`, unit: "pcs" })),
+    );
+
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409]);
+    expect(await productRows(orgA())).toHaveLength(1);
+  });
+
+  it("rejects an unknown field, organizationId included, and creates nothing", async () => {
+    const res = await send("post", "/api/products", {
+      sku: "A",
+      name: "A",
+      unit: "pcs",
+      organizationId: world.organizations.B,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ source: "body", path: "organizationId", message: "Field tidak dikenal." }]);
+    expect(await productRows(world.organizations.B)).toHaveLength(0);
+    expect(await productRows(orgA())).toHaveLength(0);
+  });
+
+  it.each([
+    [{ name: "A", unit: "pcs" }, "sku"],
+    [{ sku: "A", unit: "pcs" }, "name"],
+    [{ sku: "A", name: "A" }, "unit"],
+    [{ sku: "A", name: "A", unit: "kg" }, "unit"],
+    [{ sku: "A", name: "A", unit: "pcs", minStock: -1 }, "minStock"],
+    [{ sku: "A", name: "A", unit: "pcs", minStock: 1.5 }, "minStock"],
+    [{ sku: "A", name: "A", unit: "pcs", minStock: 1_000_000_001 }, "minStock"],
+  ])("answers 400 for %j", async (body, path) => {
+    const res = await send("post", "/api/products", body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.details.map((d) => d.path)).toContain(path);
+  });
+
+  it.each(["WAREHOUSE_ADMIN", "VIEWER"])("answers 403 to a %s before the body is read", async (role) => {
+    const res = await send("post", "/api/products", { nonsense: true }, role);
+
+    expect(res.status).toBe(403);
+    expect(await productRows(orgA())).toHaveLength(0);
+  });
+});

@@ -78,6 +78,15 @@ const TENANT_ENDPOINTS = [
   },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
+  {
+    method: "post",
+    path: "/api/products",
+    kind: "create",
+    action: "product.manage",
+    // A new SKU every time: the same body twice would be a 409, not a valid request.
+    body: () => ({ sku: `NEW-${Math.random().toString(36).slice(2, 10)}`, name: "Produk Baru", unit: "pcs" }),
+    ...product,
+  },
 ];
 
 const METHODS = ["get", "post", "put", "patch", "delete"];

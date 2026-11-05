@@ -1,4 +1,5 @@
-const { notFound } = require("../helpers/errors");
+const { UniqueConstraintError } = require("sequelize");
+const { conflict, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
 const { tenant } = require("../helpers/tenantScope");
@@ -45,4 +46,16 @@ async function show(req, res) {
   res.status(200).json(toProduct(product));
 }
 
-module.exports = { list, show, toProduct };
+// The unique key (organizationId, sku) decides "SKU exists", so a race cannot create two.
+function rethrowDuplicateSku(err) {
+  if (err instanceof UniqueConstraintError) throw conflict("SKU sudah dipakai.");
+  throw err;
+}
+
+// organizationId is added by the tenant-scoped create from the context, never from the body.
+async function create(req, res) {
+  const row = await tenant(req.ctx).Product.create(req.valid.body).catch(rethrowDuplicateSku);
+  res.status(201).json(toProduct(row));
+}
+
+module.exports = { list, show, create, toProduct };
