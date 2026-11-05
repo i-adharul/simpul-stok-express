@@ -286,7 +286,7 @@ describe("PATCH /api/products/:id", () => {
   it.each([
     [{}],
     [{ organizationId: "x" }],
-    [{ archived: true }],
+    [{ archived: "yes" }],
     [{ name: "" }],
     [{ unit: "kg" }],
     [{ minStock: -1 }],
@@ -308,7 +308,7 @@ describe("PATCH /api/products/:id", () => {
     expect((await readProduct(id)).organizationId).toBe(orgA());
   });
 
-  it("answers 404 for an archived product (it can only be restored, delivered in E3-06)", async () => {
+  it("answers 404 for an archived product unless it is being restored", async () => {
     const id = await archivedProduct("SKU-OLD");
 
     expect((await send("patch", `/api/products/${id}`, { name: "X" })).status).toBe(404);
@@ -321,5 +321,111 @@ describe("PATCH /api/products/:id", () => {
     expect((await send("patch", `/api/products/${own}`, { name: "X" }, role)).status).toBe(403);
     expect((await send("patch", `/api/products/${foreign}`, { name: "X" }, role)).status).toBe(403);
     expect((await readProduct(own)).name).not.toBe("X");
+  });
+});
+
+describe("PATCH /api/products/:id with archived (BL09)", () => {
+  const { createStockLevel } = require("./support/factories");
+  const readProduct = async (id) => (await sql(`SELECT * FROM "Products" WHERE "id" = :id`, { id }))[0];
+  const skus = async (query = "") => (await get(`/api/products${query}`)).body.items.map((p) => p.sku);
+
+  it("archives a product and hides it from the list unless the Owner asks for archived ones", async () => {
+    const id = await world.createProduct("A", "SKU-1");
+    await world.createProduct("A", "SKU-2");
+
+    const res = await send("patch", `/api/products/${id}`, { archived: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archivedAt).not.toBeNull();
+    expect((await readProduct(id)).archivedAt).not.toBeNull();
+    expect(await skus()).toEqual(["SKU-2"]);
+    expect(await skus("?includeArchived=true")).toEqual(["SKU-1", "SKU-2"]);
+  });
+
+  it("archives a product that still has stock (allowed, unlike a warehouse) and keeps the stock", async () => {
+    const id = await world.createProduct("A", "SKU-1");
+    const warehouse = await world.createWarehouse("A");
+    await createStockLevel(orgA(), warehouse, id, 12);
+
+    const res = await send("patch", `/api/products/${id}`, { archived: true });
+
+    expect(res.status).toBe(200);
+    const [stock] = await sql(`SELECT "quantity" FROM "StockLevels" WHERE "productId" = :id`, { id });
+    expect(stock.quantity).toBe(12);
+  });
+
+  it("restores an archived product with archived: false", async () => {
+    const id = await archivedProduct("SKU-OLD");
+
+    const res = await send("patch", `/api/products/${id}`, { archived: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archivedAt).toBeNull();
+    expect(await skus()).toEqual(["SKU-OLD"]);
+  });
+
+  it("restores and edits in one request", async () => {
+    const id = await archivedProduct("SKU-OLD");
+
+    const res = await send("patch", `/api/products/${id}`, { archived: false, name: "Hidup Lagi", minStock: 5 });
+
+    expect(res.body).toMatchObject({ name: "Hidup Lagi", minStock: 5, archivedAt: null });
+  });
+
+  it("finds an archived product only when restoring: any other change is 404", async () => {
+    const id = await archivedProduct("SKU-OLD");
+
+    expect((await send("patch", `/api/products/${id}`, { name: "X" })).status).toBe(404);
+    expect((await send("patch", `/api/products/${id}`, { archived: true })).status).toBe(404);
+    expect((await readProduct(id)).archivedAt).not.toBeNull();
+  });
+
+  it("treats archived: false on an active product as no change (200)", async () => {
+    const id = await world.createProduct("A");
+
+    const res = await send("patch", `/api/products/${id}`, { archived: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archivedAt).toBeNull();
+  });
+
+  it("rejects a non-boolean archived (400)", async () => {
+    const id = await world.createProduct("A");
+
+    for (const archived of ["true", 1, null]) {
+      expect((await send("patch", `/api/products/${id}`, { archived })).status).toBe(400);
+    }
+  });
+
+  it("keeps the SKU of an archived product reserved (restoring or creating a clash is a 409)", async () => {
+    await archivedProduct("SKU-OLD");
+
+    const res = await send("post", "/api/products", { sku: "SKU-OLD", name: "Baru", unit: "pcs" });
+
+    expect(res.status).toBe(409);
+  });
+
+  it("answers 404 for another organization's product, also when restoring", async () => {
+    const foreign = await archivedProduct("SKU-B", world.organizations.B);
+
+    const res = await send("patch", `/api/products/${foreign}`, { archived: false });
+
+    expect(res.status).toBe(404);
+    expect((await readProduct(foreign)).archivedAt).not.toBeNull();
+  });
+
+  it.each(["WAREHOUSE_ADMIN", "VIEWER"])("answers 403 to a %s", async (role) => {
+    const id = await world.createProduct("A");
+
+    expect((await send("patch", `/api/products/${id}`, { archived: true }, role)).status).toBe(403);
+    expect((await readProduct(id)).archivedAt).toBeNull();
+  });
+
+  it("makes the archived product invisible to a Warehouse Admin", async () => {
+    const id = await world.createProduct("A");
+    await send("patch", `/api/products/${id}`, { archived: true });
+
+    expect((await get(`/api/products/${id}`, "WAREHOUSE_ADMIN")).status).toBe(404);
+    expect((await get("/api/products", "WAREHOUSE_ADMIN")).body.total).toBe(0);
   });
 });
