@@ -22,10 +22,38 @@
 //                 warehouse-level action, or the warehouse detail): builds the request for that
 //                 warehouse, so the role tests can try an assigned and an unassigned one
 //
-// There are no tenant endpoints yet; the first entries arrive with the warehouse API (E3-01).
 const { ACTIONS } = require("../../helpers/permissions");
+const { getSequelize } = require("./db");
 
-const TENANT_ENDPOINTS = [];
+// The row as it is in the database (raw SQL, so the check does not depend on the code it checks).
+const rawRow = (table) => async (id) =>
+  (await getSequelize().query(`SELECT * FROM "${table}" WHERE "id" = :id`, { replacements: { id } }))[0][0] ?? null;
+const rawCount = (table) => async (organizationId) =>
+  Number(
+    (await getSequelize().query(`SELECT count(*) AS n FROM "${table}" WHERE "organizationId" = :organizationId`, {
+      replacements: { organizationId },
+    }))[0][0].n,
+  );
+
+const warehouse = {
+  createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
+  readRow: rawRow("Warehouses"),
+  countRows: rawCount("Warehouses"),
+};
+
+// Added by the story that adds the route (rule 16): warehouses in E3-01.
+const TENANT_ENDPOINTS = [
+  { method: "get", path: "/api/warehouses", kind: "list", action: "warehouse.read", ...warehouse },
+  {
+    method: "get",
+    path: "/api/warehouses/:id",
+    kind: "item",
+    action: "warehouse.read",
+    // The detail of a warehouse is open to a Warehouse Admin or Viewer only when it is assigned.
+    warehouseScoped: { request: async (world, warehouseId) => ({ id: warehouseId }) },
+    ...warehouse,
+  },
+];
 
 const METHODS = ["get", "post", "put", "patch", "delete"];
 const KINDS = ["item", "list", "create"];
