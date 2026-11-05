@@ -97,3 +97,16 @@ describe("parseEnv", () => {
     });
   });
 });
+
+describe("COMMIT_SHA", () => {
+  it("is null when it is not set or empty", () => {
+    expect(parseEnv(valid).COMMIT_SHA).toBeNull();
+    expect(parseEnv({ ...valid, COMMIT_SHA: "" }).COMMIT_SHA).toBeNull();
+  });
+
+  it("keeps the value when it is set", () => {
+    expect(parseEnv({ ...valid, COMMIT_SHA: "abc1234" }).COMMIT_SHA).toBe(
+      "abc1234",
+    );
+  });
+});

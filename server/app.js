@@ -1,11 +1,14 @@
 const express = require("express");
 const requestLogger = require("./middlewares/requestLogger");
+const routes = require("./routes");
 
 const app = express();
 
 // First, so every request is logged, including those the body parser or a route rejects.
 app.use(requestLogger);
 app.use(express.json());
+
+app.use("/api", routes);
 
 // Express does not treat "no route matched" as an error, so the error handler
 // never sees it. This must stay below every route.

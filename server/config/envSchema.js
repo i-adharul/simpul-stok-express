@@ -19,6 +19,11 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().min(1),
   CORS_ORIGIN: origins,
+  // Set by the deploy to the git commit being served; shown by GET /api/health. Null when unset.
+  COMMIT_SHA: z
+    .string()
+    .optional()
+    .transform((value) => value || null),
   // Lets the seed run against a non-local database (helpers/seedGuard.js). Off unless set.
   SEED_ALLOW_REMOTE: z
     .enum(["true", "false"])
