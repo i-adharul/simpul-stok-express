@@ -140,6 +140,26 @@ Verify the token before reading the body. Store a `WebhookEvent` with a unique k
 | Backup and retention | Customer data | Supabase backups; business data is archived, not permanently deleted (except `IdempotencyKey`); the audit log and history are kept indefinitely |
 | Deploy | Keeps M1 focused | Postponed to the end of M1 (E6-04): EC2 with `pm2`, Nginx and HTTPS; the client on Vercel with `VITE_API_URL`; CORS allows only the client domain |
 
+## Measured: the stock history query (BL16)
+
+The history (`GET /api/stock/movements`) must stay fast with 10,000+ rows. It was measured on a local PostgreSQL with
+24,000 `StockMovements` rows (12,000 in the measured organization, 12,000 in two others, 5 warehouses and 50 products each),
+timestamps spread over 120 days, after `ANALYZE`. Query shape: `WHERE "organizationId" = ? AND "warehouseId" IN (...)`
+`ORDER BY "createdAt" DESC, id ASC LIMIT 51`, with the index `(organizationId, createdAt DESC, id)`.
+
+| Query                              | Plan                                                           | Execution time |
+| ---------------------------------- | -------------------------------------------------------------- | -------------- |
+| First page                         | Index Scan on the history index, stops after 51 rows           | 0.014 ms       |
+| Page 5,000 rows in (keyset cursor) | Index Scan on the history index, 5,001 rows rejected by filter | 0.644 ms       |
+| One warehouse                      | Index Scan Backward on `(organizationId, warehouseId, createdAt)` + incremental sort | 0.027 ms |
+| One product                        | Bitmap scan on `(organizationId, productId, createdAt)` + top-N sort | 0.104 ms |
+| Date range (last 7 days)           | Index Scan on the history index with the range as index condition | 0.016 ms   |
+
+Reading the figures: every query uses an index that starts with `organizationId`. The cursor condition is an `OR` of two
+comparisons, so it is applied as a filter, not as an index condition: the cost of a page grows with how deep it is (a scan over
+the rows already passed). At 5,000 rows deep this is still under 1 ms. A deeper history would need a different cursor
+condition. Timings are from a single warm run on a developer machine and show the plan, not a benchmark.
+
 ## Final technical decisions
 
 - [x] REST (Express) as the only API path
