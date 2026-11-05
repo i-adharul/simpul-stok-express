@@ -97,6 +97,24 @@ describe("createWithCode", () => {
     expect(await codes()).toEqual(["MT-0002"]);
   });
 
+  it("pauses a random time of at most 30 ms between attempts by default", async () => {
+    await insertRow("MT-0002"); // collides on every attempt
+    const delays = [];
+    const real = global.setTimeout;
+    const spy = jest.spyOn(global, "setTimeout").mockImplementation((fn, ms, ...args) => {
+      if (typeof ms === "number" && ms < 31 && ms >= 0) delays.push(ms);
+      return real(fn, ms, ...args);
+    });
+    try {
+      await inTransaction((t) => createWithCode(ctx, values(), t)).catch(() => {});
+    } finally {
+      spy.mockRestore();
+    }
+    const pauses = delays.filter((ms) => ms <= 30);
+    expect(pauses.length).toBeGreaterThanOrEqual(MAX_CODE_RETRIES);
+    expect(pauses.every((ms) => ms >= 0 && ms <= 30)).toBe(true);
+  });
+
   it("does not hide a failure that is not a code collision", async () => {
     const wait = jest.fn(async () => {});
     const bad = { ...values(), toWarehouseId: from }; // CHECK from <> to
