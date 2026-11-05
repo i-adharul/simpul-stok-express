@@ -17,7 +17,12 @@ describe("models/index.js", () => {
         .filter((key) => /^[A-Z]/.test(key) && key !== "Sequelize")
         .sort(),
     ).toEqual([
+      "AuditLog",
       "IdempotencyKey",
+      "ImportJob",
+      "Invitation",
+      "Invoice",
+      "Notification",
       "Organization",
       "Plan",
       "Product",
@@ -28,6 +33,7 @@ describe("models/index.js", () => {
       "User",
       "UserWarehouse",
       "Warehouse",
+      "WebhookEvent",
     ]);
   });
 
@@ -102,5 +108,42 @@ describe("models/index.js", () => {
     expect(db.IdempotencyKey.associations.Organization.associationType).toBe(
       "BelongsTo",
     );
+  });
+
+  it("links an invitation and an import job to their organization and creator", () => {
+    expect(db.Invitation.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Invitation.associations.createdBy.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.ImportJob.associations.createdBy.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.ImportJob.associations.StockMovements.associationType).toBe(
+      "HasMany",
+    );
+    expect(db.StockMovement.associations.ImportJob.associationType).toBe(
+      "BelongsTo",
+    );
+  });
+
+  it("links an invoice to its organization, subscription and plan; a webhook event stands alone", () => {
+    expect(db.Invoice.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Invoice.associations.Subscription.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.Invoice.associations.Plan.associationType).toBe("BelongsTo");
+    expect(Object.keys(db.WebhookEvent.associations)).toEqual([]);
+  });
+
+  it("links an audit log to its organization and actor, and a notification to its recipient", () => {
+    expect(db.AuditLog.associations.Organization.associationType).toBe(
+      "BelongsTo",
+    );
+    expect(db.AuditLog.associations.actor.associationType).toBe("BelongsTo");
+    expect(db.Notification.associations.User.associationType).toBe("BelongsTo");
   });
 });
