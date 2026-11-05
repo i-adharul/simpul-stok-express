@@ -1,5 +1,6 @@
 const express = require("express");
 const stockController = require("../controllers/stockController");
+const transferController = require("../controllers/transferController");
 const authentication = require("../middlewares/authentication");
 const { requireRole } = require("../middlewares/authorization");
 const idempotencyKey = require("../middlewares/idempotencyKey");
@@ -7,6 +8,7 @@ const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
 const { receiveSchema, adjustSchema, stockListQuerySchema, movementListQuerySchema } = require("../schemas/stock.schema");
+const { transferSchema } = require("../schemas/transfer.schema");
 
 const router = express.Router();
 
@@ -54,6 +56,18 @@ router.post(
   idempotencyKey,
   validate({ body: adjustSchema }),
   stockController.adjust,
+);
+
+// A transfer is judged against its SOURCE warehouse in the controller; the destination may be any
+// active warehouse of the organization (BL13).
+router.post(
+  "/stock/transfers",
+  authentication,
+  requireRole("stock.transfer"),
+  subscriptionGuard,
+  idempotencyKey,
+  validate({ body: transferSchema }),
+  transferController.create,
 );
 
 module.exports = router;
