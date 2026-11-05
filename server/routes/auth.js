@@ -11,4 +11,7 @@ router.use("/auth", noStore);
 // Public: no token yet. No subscription check either (login must work in every state, BL23).
 router.post("/auth/login", validate({ body: loginSchema }), authController.login);
 
+// Public and without a schema: it reads no input at all (allowed in the write-route static test).
+router.post("/auth/logout", authController.logout);
+
 module.exports = router;

@@ -7,4 +7,10 @@ async function login(req, res) {
   res.status(200).json(result);
 }
 
-module.exports = { login };
+// The server keeps no session, so there is nothing to revoke: the client deletes its token. The
+// answer does not depend on the token, so a client with an expired token can still "log out".
+function logout(req, res) {
+  res.status(204).end();
+}
+
+module.exports = { login, logout };
