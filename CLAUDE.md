@@ -66,7 +66,7 @@ Every rule has a test or a static check where possible. Do not weaken a test to 
 7. Every stock write takes the warehouse lock first (`services/warehouseLock.js`, `SELECT ... FOR UPDATE`). Transfers lock both warehouses in ID order to avoid deadlocks.
 8. Decrements are conditional atomic updates (`quantity >= n`) and the affected-row count is checked. `CHECK (quantity >= 0)` in the database is the last safety net, not the first.
 9. Endpoints that change stock require an `Idempotency-Key` header (UUID). The unique key in the database is the single source of truth.
-10. `StockMovement` and `AuditLog` rows are append-only (database trigger). Business data is archived, never hard-deleted (except `IdempotencyKey`).
+10. `StockMovement` and `AuditLog` rows are append-only (database trigger). Business data is archived, never hard-deleted (except `IdempotencyKey`, and the `UserWarehouse` link rows: that table has no archive column and the assignment of a warehouse is replaced as a whole, BL10, so `PUT /api/warehouses/:id/members` deletes the rows that are no longer wanted).
 11. Secrets live only in environment variables, never in the repo, logs or error bodies. Never commit `.env`; only `.env-template.txt`. Logs redact `password`, `authorization` and `token` fields, and request bodies are not logged.
 12. Errors are `{ code, message, details }` through `AppError` and the error handler. No stack trace or SQL in a response. Login gives the same message for a wrong email and a wrong password.
 13. No new dependency without a written reason (PR description or ADR).
