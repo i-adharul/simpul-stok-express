@@ -65,3 +65,16 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "archived": false }
+
+### Assignment candidates of a warehouse (Owner only)
+# Expect 200 { candidates: [{ id, name, email, role, assigned }] }, sorted by name.
+GET {{baseUrl}}/api/warehouses/{{warehouseId}}/members
+Authorization: Bearer {{token}}
+
+### Replace the assignment (Owner only). An empty list removes every assignment; repeating gives the same result.
+# Expect 200 with the same shape as the GET. 400 for a duplicate, malformed or ineligible user; 404 for an unknown user or warehouse.
+PUT {{baseUrl}}/api/warehouses/{{warehouseId}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "userIds": ["00000000-0000-4000-8000-000000000001"] }
