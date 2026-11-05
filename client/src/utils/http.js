@@ -30,4 +30,25 @@ http.interceptors.request.use((config) => {
   return config
 })
 
+// AuthContext registers one function here. A module-level hook keeps this file free of React.
+let unauthorizedHandler = null
+
+export function onUnauthorized(handler) {
+  unauthorizedHandler = handler
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null
+  }
+}
+
+// A 401 on a request that carried a token means the session is gone (expired, or the password was
+// changed elsewhere): P19 opens. A 401 without a token (wrong login password) is a normal form error.
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const sentToken = Boolean(error.config?.headers?.Authorization)
+    if (error.response?.status === 401 && sentToken) unauthorizedHandler?.()
+    return Promise.reject(error)
+  },
+)
+
 export default http
