@@ -7,6 +7,7 @@ import ErrorState from './components/ErrorState'
 import LoadingSkeleton from './components/LoadingSkeleton'
 import Login from './views/Login'
 import Profile from './views/Profile'
+import StockSummary from './views/StockSummary'
 import { toast } from './utils/toast'
 import { formatDateTime, formatNumber } from './utils/format'
 
@@ -39,6 +40,7 @@ function App() {
           <Route element={<BaseLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="stock" element={<StockSummary />} />
             <Route path="dashboard" element={<StatesPreview />} />
             <Route path="*" element={<Placeholder title="Halaman belum tersedia" />} />
           </Route>
