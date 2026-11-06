@@ -22,7 +22,7 @@ app.use(
     origin: env.CORS_ORIGIN,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
-    exposedHeaders: ["X-Request-Id"],
+    exposedHeaders: ["X-Request-Id", "Idempotency-Replayed"],
     maxAge: 600,
   }),
 );
