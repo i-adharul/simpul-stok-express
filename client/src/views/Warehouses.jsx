@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import ArchiveConfirmModal from '../components/ArchiveConfirmModal'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
@@ -18,6 +19,8 @@ export default function Warehouses() {
   const [includeArchived, setIncludeArchived] = useState(false)
   // null: closed; 'new': create; a warehouse row: edit that row
   const [form, setForm] = useState(null)
+  // The row waiting for the P03 confirmation (archive, or restore when it is already archived)
+  const [toArchive, setToArchive] = useState(null)
   const list = usePagedList('/api/warehouses', includeArchived ? { includeArchived: true } : {})
   const { data, error, loading, page, setPage, reload, resetPage } = list
 
@@ -32,6 +35,15 @@ export default function Warehouses() {
     else await http.patch(`/api/warehouses/${form.id}`, values)
     toast.success(form === 'new' ? 'Gudang berhasil ditambahkan.' : 'Gudang berhasil diperbarui.')
     setForm(null)
+    reload()
+  }
+
+  // PATCH archived: true|false. A 409 (stock left) is thrown back to P03, which shows the server message.
+  async function setArchived() {
+    const restore = Boolean(toArchive.archivedAt)
+    await http.patch(`/api/warehouses/${toArchive.id}`, { archived: !restore })
+    toast.success(restore ? 'Gudang berhasil dipulihkan.' : 'Gudang berhasil diarsipkan.')
+    setToArchive(null)
     reload()
   }
 
@@ -104,6 +116,9 @@ export default function Warehouses() {
                             Ubah
                           </button>
                         )}
+                        <button type="button" className="btn btn-ghost btn-xs" onClick={() => setToArchive(w)}>
+                          {w.archivedAt ? 'Pulihkan' : 'Arsipkan'}
+                        </button>
                       </td>
                     )}
                   </tr>
@@ -113,6 +128,9 @@ export default function Warehouses() {
           </div>
           <Pagination total={data.total} page={page} pageSize={data.pageSize} unit="gudang" onPage={setPage} />
         </div>
+      )}
+      {toArchive && (
+        <ArchiveConfirmModal kind="gudang" name={toArchive.name} restore={Boolean(toArchive.archivedAt)} onConfirm={setArchived} onClose={() => setToArchive(null)} />
       )}
       {form && <WarehouseFormModal warehouse={form === 'new' ? null : form} onSubmit={save} onClose={() => setForm(null)} />}
     </div>
