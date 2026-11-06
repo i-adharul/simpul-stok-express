@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import ComingSoonSection from '../components/ComingSoonSection'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { UNIT_LABELS } from '../constants/units'
@@ -74,6 +75,8 @@ export default function ProductDetail() {
               <InfoRow label="Tanggal dibuat" value={formatDate(product.createdAt)} />
             </dl>
           </section>
+          <ComingSoonSection title="Stok per gudang" message="Distribusi stok produk ini di setiap gudang akan tampil di sini." />
+          <ComingSoonSection title="Riwayat produk" message="Riwayat pergerakan stok produk ini akan tampil di sini." />
         </>
       )}
     </div>
