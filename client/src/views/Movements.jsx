@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import MovementDetailDrawer from '../components/MovementDetailDrawer'
 import { MOVEMENT_TYPES } from '../constants/stock'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
 import { formatDateTime, formatNumber, wibDayStart, wibNextDayStart } from '../utils/format'
@@ -28,11 +29,11 @@ function buildParams(filters) {
   return params
 }
 
-function MovementRow({ movement, warehouses, products }) {
+function MovementRow({ movement, warehouses, products, onOpen }) {
   const product = products.get(movement.productId)
   const delta = movement.quantityDelta
   return (
-    <tr>
+    <tr className="cursor-pointer hover:bg-base-200" onClick={() => onOpen(movement.id)}>
       <td className="whitespace-nowrap text-sm">{formatDateTime(movement.createdAt)}</td>
       <td>
         <span className={`badge badge-soft ${TYPE_BADGE[movement.type]}`}>{MOVEMENT_TYPES[movement.type]}</span>
@@ -45,6 +46,11 @@ function MovementRow({ movement, warehouses, products }) {
       <td className={`text-right font-semibold ${delta < 0 ? 'text-error' : 'text-success'}`}>
         {delta > 0 && '+'}
         {formatNumber(delta)} {product?.unit}
+      </td>
+      <td>
+        <button type="button" className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); onOpen(movement.id) }}>
+          Detail
+        </button>
       </td>
     </tr>
   )
@@ -60,6 +66,7 @@ export default function Movements() {
   const [state, setState] = useState({ key: null, items: [], nextCursor: null, error: null })
   const [loadingMore, setLoadingMore] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [selectedId, setSelectedId] = useState(null) // the movement open in P13
   const requestKey = `${filtersKey}|${attempt}`
 
   useEffect(() => {
@@ -92,6 +99,7 @@ export default function Movements() {
     else next.delete(key)
     setSearchParams(next, { replace: true })
   }
+  const closeDrawer = () => setSelectedId(null)
   const clearFilters = () => setSearchParams({}, { replace: true })
   const retry = useCallback(() => setAttempt((n) => n + 1), [])
 
@@ -163,11 +171,12 @@ export default function Movements() {
                   <th>Produk</th>
                   <th>Gudang</th>
                   <th className="text-right">Perubahan</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {state.items.map((m) => (
-                  <MovementRow key={m.id} movement={m} warehouses={warehouses} products={products} />
+                  <MovementRow key={m.id} movement={m} warehouses={warehouses} products={products} onOpen={setSelectedId} />
                 ))}
               </tbody>
             </table>
@@ -181,6 +190,13 @@ export default function Movements() {
             <p className="text-xs text-base-content/60">Riwayat tidak dapat diubah.</p>
           </div>
         </div>
+      )}
+      {selectedId && (
+        <MovementDetailDrawer
+          id={selectedId}
+          typeLabel={MOVEMENT_TYPES[state.items.find((m) => m.id === selectedId)?.type]}
+          onClose={closeDrawer}
+        />
       )}
     </div>
   )
