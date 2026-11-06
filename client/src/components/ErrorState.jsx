@@ -4,7 +4,7 @@ export default function ErrorState({ message = 'Terjadi kesalahan. Silakan coba 
     <div role="alert" className="alert alert-error alert-soft">
       <span>{message}</span>
       {onRetry && (
-        <button type="button" className="btn btn-sm" onClick={onRetry}>
+        <button type="button" className="btn btn-sm shrink-0 whitespace-nowrap" onClick={onRetry}>
           Coba lagi
         </button>
       )}
