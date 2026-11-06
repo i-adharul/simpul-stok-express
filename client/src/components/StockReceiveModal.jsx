@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import FormField from './FormField'
 import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
 import http from '../utils/http'
@@ -48,13 +48,21 @@ function SelectField({ id, label, error, children, ...props }) {
 
 // P04. The warehouse list already holds only the warehouses the caller may use (docs/04), and the
 // product list only active products. `warehouseId` and `productId` preselect the fields when the popup
-// opens from S06 or S08. `onSubmit(values)` does the request and rejects with the axios error.
+// opens from S06 or S08. `onSubmit(values, idempotencyKey)` does the request and rejects with the axios error.
+//
+// Idempotency (BL14): the popup is mounted each time it opens, so `useRef(crypto.randomUUID())` gives one
+// new key per opening. A retry of the same form (after a network error or a double click) reuses it, so
+// the server applies the receipt once. Editing a field means a different intent, so it gets a new key.
 export default function StockReceiveModal({ warehouseId = '', productId = '', onSubmit, onClose }) {
   const [options, setOptions] = useState({ warehouses: [], products: [], loading: true, error: null })
   const [values, setValues] = useState({ warehouseId, productId, quantity: '', note: '' })
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
-  const set = (field) => (event) => setValues((v) => ({ ...v, [field]: event.target.value }))
+  const idempotencyKey = useRef(crypto.randomUUID())
+  const set = (field) => (event) => {
+    idempotencyKey.current = crypto.randomUUID()
+    setValues((v) => ({ ...v, [field]: event.target.value }))
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -76,12 +84,15 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
     if (Object.keys(found).length > 0) return
     setSubmitting(true)
     try {
-      await onSubmit({
-        warehouseId: values.warehouseId,
-        productId: values.productId,
-        quantity: Number(values.quantity),
-        note: values.note.trim(),
-      })
+      await onSubmit(
+        {
+          warehouseId: values.warehouseId,
+          productId: values.productId,
+          quantity: Number(values.quantity),
+          note: values.note.trim(),
+        },
+        idempotencyKey.current,
+      )
     } catch (err) {
       setErrors(serverErrors(err))
       setSubmitting(false)

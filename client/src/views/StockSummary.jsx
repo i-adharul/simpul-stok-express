@@ -142,9 +142,9 @@ export default function StockSummary() {
   const { firstCut, lastCut } = cutGroups(groups, page, totalPages)
   const filtered = Boolean(q || warehouseId || status)
 
-  // Temporary key per call; step 2 of E4-03 replaces it with one key per opening of the popup.
-  async function receive(body) {
-    await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': crypto.randomUUID() } })
+  // The popup owns the key (one per opening) and throws the axios error back so it shows it.
+  async function receive(body, idempotencyKey) {
+    await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': idempotencyKey } })
     toast.success('Penerimaan stok berhasil dicatat.')
     setReceiving(false)
     retry()
