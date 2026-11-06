@@ -8,6 +8,11 @@ import LoadingSkeleton from './components/LoadingSkeleton'
 import Login from './views/Login'
 import Profile from './views/Profile'
 import StockSummary from './views/StockSummary'
+import NotFound from './views/NotFound'
+import Forbidden from './views/Forbidden'
+import ServerError from './views/ServerError'
+import ErrorBoundary from './components/ErrorBoundary'
+import ApiErrorRedirect from './components/ApiErrorRedirect'
 import { toast } from './utils/toast'
 import { formatDateTime, formatNumber } from './utils/format'
 
@@ -34,18 +39,24 @@ function App() {
   return (
     <BrowserRouter>
       <SessionExpiredModal />
-      <Routes>
-        <Route path="login" element={<Login />} />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<BaseLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="stock" element={<StockSummary />} />
-            <Route path="dashboard" element={<StatesPreview />} />
-            <Route path="*" element={<Placeholder title="Halaman belum tersedia" />} />
+      <ApiErrorRedirect />
+      <ErrorBoundary>
+        <Routes>
+          <Route path="login" element={<Login />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<BaseLayout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="stock" element={<StockSummary />} />
+              <Route path="dashboard" element={<StatesPreview />} />
+              <Route path="not-found" element={<NotFound />} />
+              <Route path="forbidden" element={<Forbidden />} />
+              <Route path="error" element={<ServerError />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
+        </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }
