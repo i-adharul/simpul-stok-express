@@ -7,7 +7,7 @@ function getContainer() {
   if (!container) {
     container = document.createElement('div')
     container.id = CONTAINER_ID
-    container.className = 'toast toast-top toast-end z-50'
+    container.className = 'toast toast-top toast-end z-50 mt-16'
     document.body.appendChild(container)
   }
   return container
@@ -15,7 +15,7 @@ function getContainer() {
 
 function show(type, message) {
   const item = document.createElement('div')
-  item.className = `alert alert-${type}`
+  item.className = `alert alert-${type} border border-base-content/20 shadow-lg`
   item.setAttribute('role', 'status')
   item.textContent = message // textContent, never innerHTML: the message may contain user data
   getContainer().appendChild(item)
