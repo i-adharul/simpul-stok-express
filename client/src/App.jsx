@@ -12,6 +12,7 @@ import NotFound from './views/NotFound'
 import Forbidden from './views/Forbidden'
 import ServerError from './views/ServerError'
 import ErrorBoundary from './components/ErrorBoundary'
+import ApiErrorRedirect from './components/ApiErrorRedirect'
 import { toast } from './utils/toast'
 import { formatDateTime, formatNumber } from './utils/format'
 
@@ -38,6 +39,7 @@ function App() {
   return (
     <BrowserRouter>
       <SessionExpiredModal />
+      <ApiErrorRedirect />
       <ErrorBoundary>
         <Routes>
           <Route path="login" element={<Login />} />
