@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import ArchiveConfirmModal from '../components/ArchiveConfirmModal'
+import AssignUsersModal from '../components/AssignUsersModal'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import WarehouseFormModal from '../components/WarehouseFormModal'
+import { useAuth } from '../context/authContext'
 import { ROLE_LABELS } from '../constants/navigation'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
 import http from '../utils/http'
+import { toast } from '../utils/toast'
 import NotFound from './NotFound'
 
 // S06. GET /api/warehouses/:id returns the warehouse plus `assignedUsers` (active users, no emails).
@@ -12,6 +17,10 @@ import NotFound from './NotFound'
 // Viewer gets 403, which the http interceptor already turns into the forbidden page.
 export default function WarehouseDetail() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const isOwner = user?.role === 'OWNER'
+  // Which popup is open: 'edit' (P01), 'archive' (P03) or 'assign' (P06)
+  const [popup, setPopup] = useState(null)
   const [state, setState] = useState({ id: null, warehouse: null, error: null, notFound: false })
   const [attempt, setAttempt] = useState(0)
   const key = `${id}|${attempt}`
@@ -34,6 +43,23 @@ export default function WarehouseDetail() {
   }, [id, attempt, key])
 
   const { warehouse, error, notFound } = state
+  const reload = () => setAttempt((n) => n + 1)
+
+  // Each popup throws the axios error back to itself, which shows it; on success: toast, close, reload.
+  async function saveForm(values) {
+    await http.patch(`/api/warehouses/${id}`, values)
+    toast.success('Gudang berhasil diperbarui.')
+    setPopup(null)
+    reload()
+  }
+
+  async function setArchived() {
+    const restore = Boolean(warehouse.archivedAt)
+    await http.patch(`/api/warehouses/${id}`, { archived: !restore })
+    toast.success(restore ? 'Gudang berhasil dipulihkan.' : 'Gudang berhasil diarsipkan.')
+    setPopup(null)
+    reload()
+  }
   const loading = loadedKey !== key
 
   if (!loading && notFound) return <NotFound />
@@ -58,8 +84,39 @@ export default function WarehouseDetail() {
               </span>
             </div>
             <p className="mt-1 text-sm text-base-content/70">{warehouse.address || 'Alamat belum diisi.'}</p>
+            {isOwner && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {!warehouse.archivedAt && (
+                  <>
+                    <button type="button" className="btn btn-sm" onClick={() => setPopup('edit')}>
+                      Ubah gudang
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={() => setPopup('assign')}>
+                      Tugaskan pengguna
+                    </button>
+                  </>
+                )}
+                <button type="button" className="btn btn-sm" onClick={() => setPopup('archive')}>
+                  {warehouse.archivedAt ? 'Pulihkan gudang' : 'Arsipkan gudang'}
+                </button>
+              </div>
+            )}
           </div>
           <AssignedUsers users={warehouse.assignedUsers} />
+          {popup === 'edit' && <WarehouseFormModal warehouse={warehouse} onSubmit={saveForm} onClose={() => setPopup(null)} />}
+          {popup === 'archive' && (
+            <ArchiveConfirmModal kind="gudang" name={warehouse.name} restore={Boolean(warehouse.archivedAt)} onConfirm={setArchived} onClose={() => setPopup(null)} />
+          )}
+          {popup === 'assign' && (
+            <AssignUsersModal
+              warehouse={warehouse}
+              onSaved={() => {
+                setPopup(null)
+                reload()
+              }}
+              onClose={() => setPopup(null)}
+            />
+          )}
         </>
       )}
     </div>
