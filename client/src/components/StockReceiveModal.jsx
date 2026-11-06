@@ -25,6 +25,8 @@ function serverErrors(error) {
     const byField = fieldErrorsFrom(error)
     if (Object.keys(byField).length > 0) return byField
   }
+  // No response at all: the request may or may not have arrived. Sending again with the same key is safe.
+  if (!error.response) return { general: `${errorText(error)} Anda boleh mencoba lagi; penerimaan tidak akan tercatat dua kali.` }
   return { general: errorText(error) ?? GENERIC_ERROR }
 }
 
@@ -59,6 +61,8 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const idempotencyKey = useRef(crypto.randomUUID())
+  // A ref, not only state: it blocks a second click that arrives before React has re-rendered.
+  const inFlight = useRef(false)
   const set = (field) => (event) => {
     idempotencyKey.current = crypto.randomUUID()
     setValues((v) => ({ ...v, [field]: event.target.value }))
@@ -78,10 +82,11 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (submitting) return
+    if (inFlight.current) return
     const found = validateReceipt(values)
     setErrors(found)
     if (Object.keys(found).length > 0) return
+    inFlight.current = true
     setSubmitting(true)
     try {
       await onSubmit(
@@ -95,6 +100,7 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
       )
     } catch (err) {
       setErrors(serverErrors(err))
+      inFlight.current = false
       setSubmitting(false)
     }
   }

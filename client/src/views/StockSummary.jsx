@@ -144,8 +144,10 @@ export default function StockSummary() {
 
   // The popup owns the key (one per opening) and throws the axios error back so it shows it.
   async function receive(body, idempotencyKey) {
-    await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': idempotencyKey } })
-    toast.success('Penerimaan stok berhasil dicatat.')
+    const res = await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    // A replay (BL14) is the answer to an earlier identical send: nothing was added a second time.
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Penerimaan ini sudah tercatat sebelumnya. Stok tidak bertambah dua kali.')
+    else toast.success('Penerimaan stok berhasil dicatat.')
     setReceiving(false)
     retry()
   }
