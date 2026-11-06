@@ -36,3 +36,19 @@
   --depth: 0;
   --noise: 0;
 }
+
+/* daisyUI draws focus outlines with --color-base-content (almost black); use the brand colour. */
+.input:focus,
+.input:focus-within,
+.select:focus,
+.select:focus-within,
+.textarea:focus {
+  --input-color: var(--color-primary);
+  outline-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
+  outline-offset: 0;
+}
+
+.btn:focus-visible {
+  outline-color: color-mix(in oklab, var(--color-primary) 55%, transparent);
+  outline-offset: 2px;
+}
