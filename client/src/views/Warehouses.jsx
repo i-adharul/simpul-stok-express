@@ -4,7 +4,10 @@ import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import Pagination from '../components/Pagination'
+import WarehouseFormModal from '../components/WarehouseFormModal'
 import { useAuth } from '../context/authContext'
+import http from '../utils/http'
+import { toast } from '../utils/toast'
 import { usePagedList } from '../utils/usePagedList'
 
 // S05. Every role may read; the API already limits Warehouse Admin and Viewer to their own warehouses.
@@ -13,12 +16,23 @@ export default function Warehouses() {
   const { user } = useAuth()
   const isOwner = user?.role === 'OWNER'
   const [includeArchived, setIncludeArchived] = useState(false)
+  // null: closed; 'new': create; a warehouse row: edit that row
+  const [form, setForm] = useState(null)
   const list = usePagedList('/api/warehouses', includeArchived ? { includeArchived: true } : {})
   const { data, error, loading, page, setPage, reload, resetPage } = list
 
   const toggleArchived = (event) => {
     setIncludeArchived(event.target.checked)
     resetPage()
+  }
+
+  // The modal stays open on failure (it shows the error and keeps what was typed); on success: toast, close, reload.
+  async function save(values) {
+    if (form === 'new') await http.post('/api/warehouses', values)
+    else await http.patch(`/api/warehouses/${form.id}`, values)
+    toast.success(form === 'new' ? 'Gudang berhasil ditambahkan.' : 'Gudang berhasil diperbarui.')
+    setForm(null)
+    reload()
   }
 
   return (
@@ -28,6 +42,11 @@ export default function Warehouses() {
           <h1 className="text-2xl font-bold">Gudang</h1>
           <p className="text-sm text-base-content/70">Kelola lokasi penyimpanan dan operasional cabang Anda.</p>
         </div>
+        {isOwner && (
+          <button type="button" className="btn btn-primary" onClick={() => setForm('new')}>
+            Tambah gudang
+          </button>
+        )}
       </div>
 
       {isOwner && (
@@ -46,6 +65,8 @@ export default function Warehouses() {
               ? 'Belum ada gudang. Tambahkan gudang pertama Anda.'
               : 'Belum ada gudang yang ditugaskan kepada Anda.'
           }
+          actionLabel={isOwner ? 'Tambah gudang' : undefined}
+          onAction={() => setForm('new')}
         />
       )}
       {!error && data && data.total > 0 && (
@@ -58,6 +79,7 @@ export default function Warehouses() {
                   <th>Nama gudang</th>
                   <th>Alamat</th>
                   <th>Status</th>
+                  {isOwner && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -75,6 +97,15 @@ export default function Warehouses() {
                         {w.archivedAt ? 'Diarsipkan' : 'Aktif'}
                       </span>
                     </td>
+                    {isOwner && (
+                      <td className="text-right">
+                        {!w.archivedAt && (
+                          <button type="button" className="btn btn-ghost btn-xs" onClick={() => setForm(w)}>
+                            Ubah
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -83,6 +114,7 @@ export default function Warehouses() {
           <Pagination total={data.total} page={page} pageSize={data.pageSize} unit="gudang" onPage={setPage} />
         </div>
       )}
+      {form && <WarehouseFormModal warehouse={form === 'new' ? null : form} onSubmit={save} onClose={() => setForm(null)} />}
     </div>
   )
 }

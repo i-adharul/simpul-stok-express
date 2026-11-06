@@ -4,7 +4,7 @@ import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
 
 // Same limits as the API (docs/04: code 1 to 20, name 1 to 100, address at most 255). The server
 // validates again; this only saves a round trip and points at the field.
-export function validateWarehouse({ code, name, address }) {
+function validateWarehouse({ code, name, address }) {
   const errors = {}
   if (!code.trim()) errors.code = 'Kode gudang wajib diisi.'
   else if (code.trim().length > 20) errors.code = 'Kode gudang maksimal 20 karakter.'
