@@ -4,8 +4,11 @@ import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import Pagination from '../components/Pagination'
+import ProductFormModal from '../components/ProductFormModal'
 import { useAuth } from '../context/authContext'
 import { formatNumber } from '../utils/format'
+import http from '../utils/http'
+import { toast } from '../utils/toast'
 import { usePagedList } from '../utils/usePagedList'
 
 // S07. Every role may read. The products API has no search parameter, so there is no search box
@@ -14,6 +17,8 @@ export default function Products() {
   const { user } = useAuth()
   const isOwner = user?.role === 'OWNER'
   const [includeArchived, setIncludeArchived] = useState(false)
+  // null: closed; 'new': create; a product row: edit that row
+  const [form, setForm] = useState(null)
   const { data, error, loading, page, setPage, reload, resetPage } = usePagedList(
     '/api/products',
     includeArchived ? { includeArchived: true } : {},
@@ -24,11 +29,27 @@ export default function Products() {
     resetPage()
   }
 
+  // The modal stays open on failure (it shows the error); on success: toast, close, reload the page.
+  async function save(values) {
+    if (form === 'new') await http.post('/api/products', values)
+    else await http.patch(`/api/products/${form.id}`, values)
+    toast.success(form === 'new' ? 'Produk berhasil ditambahkan.' : 'Produk berhasil diperbarui.')
+    setForm(null)
+    reload()
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Produk</h1>
-        <p className="text-sm text-base-content/70">Katalog produk organisasi Anda.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Produk</h1>
+          <p className="text-sm text-base-content/70">Katalog produk organisasi Anda.</p>
+        </div>
+        {isOwner && (
+          <button type="button" className="btn btn-primary" onClick={() => setForm('new')}>
+            Tambah produk
+          </button>
+        )}
       </div>
 
       {isOwner && (
@@ -41,7 +62,11 @@ export default function Products() {
       {error && <ErrorState message={error} onRetry={reload} />}
       {!error && loading && !data && <LoadingSkeleton rows={6} />}
       {!error && data && data.total === 0 && (
-        <EmptyState message={isOwner ? 'Belum ada produk. Tambahkan produk pertama Anda.' : 'Belum ada produk.'} />
+        <EmptyState
+          message={isOwner ? 'Belum ada produk. Tambahkan produk pertama Anda.' : 'Belum ada produk.'}
+          actionLabel={isOwner ? 'Tambah produk' : undefined}
+          onAction={() => setForm('new')}
+        />
       )}
       {!error && data && data.total > 0 && (
         <div className={`rounded-xl border border-base-300 bg-base-100 ${loading ? 'opacity-60' : ''}`}>
@@ -54,6 +79,7 @@ export default function Products() {
                   <th>Satuan</th>
                   <th className="text-right">Batas minimum</th>
                   <th>Status</th>
+                  {isOwner && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -74,6 +100,15 @@ export default function Products() {
                         {p.archivedAt ? 'Diarsipkan' : 'Aktif'}
                       </span>
                     </td>
+                    {isOwner && (
+                      <td className="text-right">
+                        {!p.archivedAt && (
+                          <button type="button" className="btn btn-ghost btn-xs" onClick={() => setForm(p)}>
+                            Ubah
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -82,6 +117,7 @@ export default function Products() {
           <Pagination total={data.total} page={page} pageSize={data.pageSize} unit="produk" onPage={setPage} />
         </div>
       )}
+      {form && <ProductFormModal product={form === 'new' ? null : form} onSubmit={save} onClose={() => setForm(null)} />}
     </div>
   )
 }
