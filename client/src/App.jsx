@@ -9,6 +9,7 @@ import Login from './views/Login'
 import Profile from './views/Profile'
 import StockSummary from './views/StockSummary'
 import Warehouses from './views/Warehouses'
+import Products from './views/Products'
 import NotFound from './views/NotFound'
 import Forbidden from './views/Forbidden'
 import ServerError from './views/ServerError'
@@ -50,6 +51,7 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="stock" element={<StockSummary />} />
               <Route path="warehouses" element={<Warehouses />} />
+              <Route path="products" element={<Products />} />
               <Route path="dashboard" element={<StatesPreview />} />
               <Route path="not-found" element={<NotFound />} />
               <Route path="forbidden" element={<Forbidden />} />
