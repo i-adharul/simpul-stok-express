@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import StockAdjustModal from '../components/StockAdjustModal'
 import StockReceiveModal from '../components/StockReceiveModal'
 import { useAuth } from '../context/authContext'
 import http from '../utils/http'
@@ -75,7 +76,8 @@ function StockRow({ group, warehouses, unknown }) {
 export default function StockSummary() {
   const { user } = useAuth()
   const canWrite = user?.role === 'OWNER' || user?.role === 'WAREHOUSE_ADMIN'
-  const [receiving, setReceiving] = useState(false)
+  // Which stock popup is open: 'receive' (P04), 'adjust' (P05) or null
+  const [popup, setPopup] = useState(null)
   const [warehouses, setWarehouses] = useState([])
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -148,7 +150,15 @@ export default function StockSummary() {
     // A replay (BL14) is the answer to an earlier identical send: nothing was added a second time.
     if (res.headers['idempotency-replayed'] === 'true') toast.info('Penerimaan ini sudah tercatat sebelumnya. Stok tidak bertambah dua kali.')
     else toast.success('Penerimaan stok berhasil dicatat.')
-    setReceiving(false)
+    setPopup(null)
+    retry()
+  }
+
+  async function adjust(body, idempotencyKey) {
+    const res = await http.post('/api/stock/adjust', body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Penyesuaian ini sudah tercatat sebelumnya. Stok tidak berubah dua kali.')
+    else toast.success('Penyesuaian stok berhasil dicatat.')
+    setPopup(null)
     retry()
   }
 
@@ -162,12 +172,18 @@ export default function StockSummary() {
           </p>
         </div>
         {canWrite && (
-          <button type="button" className="btn btn-primary" onClick={() => setReceiving(true)}>
-            Terima barang
-          </button>
+          <div className="flex gap-2">
+            <button type="button" className="btn" onClick={() => setPopup('adjust')}>
+              Sesuaikan stok
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setPopup('receive')}>
+              Terima barang
+            </button>
+          </div>
         )}
       </div>
-      {receiving && <StockReceiveModal onSubmit={receive} onClose={() => setReceiving(false)} />}
+      {popup === 'receive' && <StockReceiveModal onSubmit={receive} onClose={() => setPopup(null)} />}
+      {popup === 'adjust' && <StockAdjustModal onSubmit={adjust} onClose={() => setPopup(null)} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Habis" value={data?.summary.out ?? 0} tone="text-error" />

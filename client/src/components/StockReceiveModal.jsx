@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import FormField from './FormField'
+import SelectField from './SelectField'
 import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
-import http from '../utils/http'
+import { useStockOptions } from '../utils/useStockOptions'
 
 const MAX_QUANTITY = 1_000_000
 const MAX_NOTE = 255
@@ -30,24 +31,6 @@ function serverErrors(error) {
   return { general: errorText(error) ?? GENERIC_ERROR }
 }
 
-function SelectField({ id, label, error, children, ...props }) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-semibold">
-        {label} <span className="text-error">*</span>
-      </label>
-      <select id={id} className={`select w-full ${error ? 'select-error' : ''}`} aria-invalid={Boolean(error)} {...props}>
-        {children}
-      </select>
-      {error && (
-        <p role="alert" className="text-sm font-medium text-error">
-          {error}
-        </p>
-      )}
-    </div>
-  )
-}
-
 // P04. The warehouse list already holds only the warehouses the caller may use (docs/04), and the
 // product list only active products. `warehouseId` and `productId` preselect the fields when the popup
 // opens from S06 or S08. `onSubmit(values, idempotencyKey)` does the request and rejects with the axios error.
@@ -56,7 +39,7 @@ function SelectField({ id, label, error, children, ...props }) {
 // new key per opening. A retry of the same form (after a network error or a double click) reuses it, so
 // the server applies the receipt once. Editing a field means a different intent, so it gets a new key.
 export default function StockReceiveModal({ warehouseId = '', productId = '', onSubmit, onClose }) {
-  const [options, setOptions] = useState({ warehouses: [], products: [], loading: true, error: null })
+  const options = useStockOptions()
   const [values, setValues] = useState({ warehouseId, productId, quantity: '', note: '' })
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -67,18 +50,6 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
     idempotencyKey.current = crypto.randomUUID()
     setValues((v) => ({ ...v, [field]: event.target.value }))
   }
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const config = { params: { pageSize: 100 }, signal: controller.signal }
-    Promise.all([http.get('/api/warehouses', config), http.get('/api/products', config)])
-      .then(([w, p]) => setOptions({ warehouses: w.data.items, products: p.data.items, loading: false, error: null }))
-      .catch((err) => {
-        if (controller.signal.aborted) return
-        setOptions((o) => ({ ...o, loading: false, error: errorText(err) ?? GENERIC_ERROR }))
-      })
-    return () => controller.abort()
-  }, [])
 
   async function handleSubmit(event) {
     event.preventDefault()
