@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import ArchiveConfirmModal from '../components/ArchiveConfirmModal'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
@@ -19,6 +20,8 @@ export default function Products() {
   const [includeArchived, setIncludeArchived] = useState(false)
   // null: closed; 'new': create; a product row: edit that row
   const [form, setForm] = useState(null)
+  // The row waiting for the P03 confirmation (archive, or restore when it is already archived)
+  const [toArchive, setToArchive] = useState(null)
   const { data, error, loading, page, setPage, reload, resetPage } = usePagedList(
     '/api/products',
     includeArchived ? { includeArchived: true } : {},
@@ -35,6 +38,15 @@ export default function Products() {
     else await http.patch(`/api/products/${form.id}`, values)
     toast.success(form === 'new' ? 'Produk berhasil ditambahkan.' : 'Produk berhasil diperbarui.')
     setForm(null)
+    reload()
+  }
+
+  // PATCH archived: true|false. Archiving a product that still has stock is allowed (BL09).
+  async function setArchived() {
+    const restore = Boolean(toArchive.archivedAt)
+    await http.patch(`/api/products/${toArchive.id}`, { archived: !restore })
+    toast.success(restore ? 'Produk berhasil dipulihkan.' : 'Produk berhasil diarsipkan.')
+    setToArchive(null)
     reload()
   }
 
@@ -107,6 +119,9 @@ export default function Products() {
                             Ubah
                           </button>
                         )}
+                        <button type="button" className="btn btn-ghost btn-xs" onClick={() => setToArchive(p)}>
+                          {p.archivedAt ? 'Pulihkan' : 'Arsipkan'}
+                        </button>
                       </td>
                     )}
                   </tr>
@@ -116,6 +131,9 @@ export default function Products() {
           </div>
           <Pagination total={data.total} page={page} pageSize={data.pageSize} unit="produk" onPage={setPage} />
         </div>
+      )}
+      {toArchive && (
+        <ArchiveConfirmModal kind="produk" name={toArchive.name} restore={Boolean(toArchive.archivedAt)} onConfirm={setArchived} onClose={() => setToArchive(null)} />
       )}
       {form && <ProductFormModal product={form === 'new' ? null : form} onSubmit={save} onClose={() => setForm(null)} />}
     </div>
