@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import ArchiveConfirmModal from '../components/ArchiveConfirmModal'
 import AssignUsersModal from '../components/AssignUsersModal'
+import ComingSoonSection from '../components/ComingSoonSection'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import WarehouseFormModal from '../components/WarehouseFormModal'
@@ -103,6 +104,8 @@ export default function WarehouseDetail() {
             )}
           </div>
           <AssignedUsers users={warehouse.assignedUsers} />
+          <ComingSoonSection title="Stok" message="Daftar stok per produk di gudang ini akan tampil di sini." />
+          <ComingSoonSection title="Riwayat" message="Riwayat pergerakan stok gudang ini akan tampil di sini." />
           {popup === 'edit' && <WarehouseFormModal warehouse={warehouse} onSubmit={saveForm} onClose={() => setPopup(null)} />}
           {popup === 'archive' && (
             <ArchiveConfirmModal kind="gudang" name={warehouse.name} restore={Boolean(warehouse.archivedAt)} onConfirm={setArchived} onClose={() => setPopup(null)} />
