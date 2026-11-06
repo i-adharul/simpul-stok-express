@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import FormField from './FormField'
 import SelectField from './SelectField'
+import { ADJUST_REASONS } from '../constants/stock'
 import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
 import { formatNumber } from '../utils/format'
 import http from '../utils/http'
@@ -8,7 +9,6 @@ import { useStockOptions } from '../utils/useStockOptions'
 
 const MAX_VALUE = 1_000_000
 const MAX_NOTE = 255
-const REASONS = { STOCK_OPNAME: 'Stok opname', DAMAGED: 'Rusak', LOST: 'Hilang', CORRECTION: 'Koreksi' }
 const MODES = { DELTA: 'Selisih', SET: 'Jumlah akhir' }
 
 // The quantity after the adjustment, or null while the value is not a valid whole number yet.
@@ -36,7 +36,7 @@ function validateAdjustment({ warehouseId, productId, mode, value, reason, note 
     else if (next !== null && next > MAX_VALUE) errors.value = 'Stok akhir maksimal 1.000.000.'
     else if (next !== null && next === current) errors.value = 'Stok baru sama dengan stok saat ini.'
   }
-  if (!REASONS[reason]) errors.reason = 'Pilih alasan penyesuaian.'
+  if (!ADJUST_REASONS[reason]) errors.reason = 'Pilih alasan penyesuaian.'
   if (note.trim().length > MAX_NOTE) errors.note = 'Catatan maksimal 255 karakter.'
   return errors
 }
@@ -185,7 +185,7 @@ export default function StockAdjustModal({ warehouseId = '', productId = '', onS
         )}
         <SelectField id="adjust-reason" label="Alasan penyesuaian" value={values.reason} onChange={set('reason')} error={errors.reason}>
           <option value="">Pilih alasan</option>
-          {Object.entries(REASONS).map(([value, label]) => (
+          {Object.entries(ADJUST_REASONS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
