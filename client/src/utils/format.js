@@ -43,3 +43,15 @@ export function formatRupiah(value) {
   const text = formatNumber(value)
   return text ? `Rp${text}` : ''
 }
+
+// A calendar day typed by the user ("2026-11-05") is a day in WIB, which is UTC+7 all year (no daylight
+// saving). The history API takes instants with an offset: `from` inclusive, `to` exclusive.
+export function wibDayStart(day) {
+  return `${day}T00:00:00+07:00`
+}
+
+// The start of the day after `day`, so a "to" date typed by the user includes that whole day.
+export function wibNextDayStart(day) {
+  const [y, m, d] = day.split('-').map(Number)
+  return wibDayStart(new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10))
+}

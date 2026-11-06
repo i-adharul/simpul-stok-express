@@ -8,6 +8,7 @@ import LoadingSkeleton from './components/LoadingSkeleton'
 import Login from './views/Login'
 import Profile from './views/Profile'
 import StockSummary from './views/StockSummary'
+import Movements from './views/Movements'
 import Warehouses from './views/Warehouses'
 import Products from './views/Products'
 import WarehouseDetail from './views/WarehouseDetail'
@@ -52,6 +53,7 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="profile" element={<Profile />} />
               <Route path="stock" element={<StockSummary />} />
+              <Route path="movements" element={<Movements />} />
               <Route path="warehouses" element={<Warehouses />} />
               <Route path="warehouses/:id" element={<WarehouseDetail />} />
               <Route path="products" element={<Products />} />
