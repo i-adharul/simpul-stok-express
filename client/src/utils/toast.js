@@ -7,15 +7,19 @@ function getContainer() {
   if (!container) {
     container = document.createElement('div')
     container.id = CONTAINER_ID
-    container.className = 'toast toast-top toast-end z-50 mt-16'
+    container.className = 'toast toast-bottom toast-end z-50'
     document.body.appendChild(container)
   }
   return container
 }
 
+// Full class names on purpose: Tailwind finds classes by scanning source text, so a name built as
+// `alert-${type}` is never seen and the CSS for it is never generated.
+const ALERT_CLASS = { success: 'alert-success', error: 'alert-error', info: 'alert-info' }
+
 function show(type, message) {
   const item = document.createElement('div')
-  item.className = `alert alert-${type} border border-base-content/20 shadow-lg`
+  item.className = `alert ${ALERT_CLASS[type]} shadow-lg`
   item.setAttribute('role', 'status')
   item.textContent = message // textContent, never innerHTML: the message may contain user data
   getContainer().appendChild(item)
