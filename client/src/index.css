@@ -37,18 +37,35 @@
   --noise: 0;
 }
 
-/* daisyUI draws focus outlines with --color-base-content (almost black); use the brand colour. */
+/* daisyUI draws focus outlines with --color-base-content (almost black); use the brand colour.
+   Listed one by one, not with `*`: some daisyUI rules hide an outline on purpose with a
+   transparent colour, and those must keep working. */
 .input:focus,
 .input:focus-within,
 .select:focus,
 .select:focus-within,
-.textarea:focus {
+.select:open,
+.textarea:focus,
+.textarea:focus-within {
   --input-color: var(--color-primary);
   outline-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
   outline-offset: 0;
 }
 
-.btn:focus-visible {
+.btn:focus-visible,
+.btn:has(:focus-visible),
+.toggle:focus-visible,
+.toggle:has(:focus-visible),
+.checkbox:focus-visible,
+.radio:focus-visible,
+.link:focus-visible {
   outline-color: color-mix(in oklab, var(--color-primary) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* Plain links and buttons (for example sidebar links) that daisyUI does not style. */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 55%, transparent);
   outline-offset: 2px;
 }
