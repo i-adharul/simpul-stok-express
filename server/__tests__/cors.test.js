@@ -39,6 +39,12 @@ describe("CORS allowlist", () => {
     expect(res.headers).not.toHaveProperty(ACAO);
   });
 
+  it("lets a browser page read the idempotency replay header (BL14)", async () => {
+    const res = await request(app).get("/api/health").set("Origin", ALLOWED);
+
+    expect(res.headers["access-control-expose-headers"]).toMatch(/Idempotency-Replayed/i);
+  });
+
   it("never allows credentials", async () => {
     const res = await request(app).get("/api/health").set("Origin", ALLOWED);
 

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import StockReceiveModal from '../components/StockReceiveModal'
+import { useAuth } from '../context/authContext'
 import http from '../utils/http'
+import { toast } from '../utils/toast'
 import { formatNumber } from '../utils/format'
 import { STATUS_LABELS, cutGroups, groupByProduct } from '../utils/stockMatrix'
 
@@ -70,6 +73,9 @@ function StockRow({ group, warehouses, unknown }) {
 
 // S09. Reads GET /api/stock (only the warehouses the user may access) and GET /api/warehouses (columns).
 export default function StockSummary() {
+  const { user } = useAuth()
+  const canWrite = user?.role === 'OWNER' || user?.role === 'WAREHOUSE_ADMIN'
+  const [receiving, setReceiving] = useState(false)
   const [warehouses, setWarehouses] = useState([])
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -136,14 +142,32 @@ export default function StockSummary() {
   const { firstCut, lastCut } = cutGroups(groups, page, totalPages)
   const filtered = Boolean(q || warehouseId || status)
 
+  // The popup owns the key (one per opening) and throws the axios error back so it shows it.
+  async function receive(body, idempotencyKey) {
+    const res = await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    // A replay (BL14) is the answer to an earlier identical send: nothing was added a second time.
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Penerimaan ini sudah tercatat sebelumnya. Stok tidak bertambah dua kali.')
+    else toast.success('Penerimaan stok berhasil dicatat.')
+    setReceiving(false)
+    retry()
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Ringkasan stok</h1>
-        <p className="text-sm text-base-content/70">
-          Stok per gudang dan produk{warehouses.length > 0 && ` di ${formatNumber(warehouses.length)} gudang`}.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Ringkasan stok</h1>
+          <p className="text-sm text-base-content/70">
+            Stok per gudang dan produk{warehouses.length > 0 && ` di ${formatNumber(warehouses.length)} gudang`}.
+          </p>
+        </div>
+        {canWrite && (
+          <button type="button" className="btn btn-primary" onClick={() => setReceiving(true)}>
+            Terima barang
+          </button>
+        )}
       </div>
+      {receiving && <StockReceiveModal onSubmit={receive} onClose={() => setReceiving(false)} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Habis" value={data?.summary.out ?? 0} tone="text-error" />
