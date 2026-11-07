@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import ComingSoonSection from '../components/ComingSoonSection'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import MovementHistorySection from '../components/MovementHistorySection'
+import ProductStockSection from '../components/ProductStockSection'
+import StockReceiveModal from '../components/StockReceiveModal'
+import { useAuth } from '../context/authContext'
 import { UNIT_LABELS } from '../constants/units'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
 import { formatDate, formatNumber } from '../utils/format'
 import http from '../utils/http'
+import { toast } from '../utils/toast'
 import NotFound from './NotFound'
 
 function InfoRow({ label, value }) {
@@ -22,6 +26,11 @@ function InfoRow({ label, value }) {
 // seen by a non-Owner, is a 404 (BL29): shown as the 404 page.
 export default function ProductDetail() {
   const { id } = useParams()
+  const { user } = useAuth()
+  // Owner and Warehouse Admin may receive stock (the API checks again); a Viewer only reads.
+  const canWrite = user?.role === 'OWNER' || user?.role === 'WAREHOUSE_ADMIN'
+  const [receiving, setReceiving] = useState(false) // P04 open
+  const [stockVersion, setStockVersion] = useState(0) // bumped after a receipt so stock and history reload
   const [state, setState] = useState({ product: null, error: null, notFound: false })
   const [attempt, setAttempt] = useState(0)
   const [loadedKey, setLoadedKey] = useState(null)
@@ -42,6 +51,16 @@ export default function ProductDetail() {
       })
     return () => controller.abort()
   }, [id, attempt, key])
+
+  // The popup owns the Idempotency-Key (one per opening) and throws the axios error back so it shows it.
+  async function receive(body, idempotencyKey) {
+    const res = await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    // A replay (BL14) answers an earlier identical send: nothing was added a second time.
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Penerimaan ini sudah tercatat sebelumnya. Stok tidak bertambah dua kali.')
+    else toast.success('Penerimaan stok berhasil dicatat.')
+    setReceiving(false)
+    setStockVersion((n) => n + 1)
+  }
 
   const { product, error, notFound } = state
   const loading = loadedKey !== key
@@ -65,6 +84,11 @@ export default function ProductDetail() {
             <span className={`badge badge-soft ${product.archivedAt ? 'badge-ghost' : 'badge-success'}`}>
               {product.archivedAt ? 'Diarsipkan' : 'Aktif'}
             </span>
+            {canWrite && !product.archivedAt && (
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => setReceiving(true)}>
+                Terima stok
+              </button>
+            )}
           </div>
           <section className="rounded-xl border border-base-300 bg-base-100 p-4">
             <h2 className="font-semibold">Informasi produk</h2>
@@ -75,8 +99,9 @@ export default function ProductDetail() {
               <InfoRow label="Tanggal dibuat" value={formatDate(product.createdAt)} />
             </dl>
           </section>
-          <ComingSoonSection title="Stok per gudang" message="Distribusi stok produk ini di setiap gudang akan tampil di sini." />
-          <ComingSoonSection title="Riwayat produk" message="Riwayat pergerakan stok produk ini akan tampil di sini." />
+          <ProductStockSection productId={product.id} unit={product.unit} refreshKey={stockVersion} />
+          <MovementHistorySection scope={{ productId: product.id }} refreshKey={stockVersion} title="Riwayat produk" />
+          {receiving && <StockReceiveModal productId={product.id} onSubmit={receive} onClose={() => setReceiving(false)} />}
         </>
       )}
     </div>
