@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import ArchiveConfirmModal from '../components/ArchiveConfirmModal'
 import AssignUsersModal from '../components/AssignUsersModal'
-import ComingSoonSection from '../components/ComingSoonSection'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import MovementHistorySection from '../components/MovementHistorySection'
+import StockAdjustModal from '../components/StockAdjustModal'
+import StockReceiveModal from '../components/StockReceiveModal'
 import WarehouseFormModal from '../components/WarehouseFormModal'
+import WarehouseStockSection from '../components/WarehouseStockSection'
 import { useAuth } from '../context/authContext'
 import { ROLE_LABELS } from '../constants/navigation'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
@@ -20,7 +23,11 @@ export default function WarehouseDetail() {
   const { id } = useParams()
   const { user } = useAuth()
   const isOwner = user?.role === 'OWNER'
-  // Which popup is open: 'edit' (P01), 'archive' (P03) or 'assign' (P06)
+  // Owner and Warehouse Admin may change stock (the API checks again); a Viewer only reads.
+  const canWrite = isOwner || user?.role === 'WAREHOUSE_ADMIN'
+  // Bumped after a receipt or adjustment so the stock and history blocks read again.
+  const [stockVersion, setStockVersion] = useState(0)
+  // Which popup is open: 'edit' (P01), 'archive' (P03), 'assign' (P06), 'receive' (P04) or 'adjust' (P05)
   const [popup, setPopup] = useState(null)
   const [state, setState] = useState({ id: null, warehouse: null, error: null, notFound: false })
   const [attempt, setAttempt] = useState(0)
@@ -61,6 +68,27 @@ export default function WarehouseDetail() {
     setPopup(null)
     reload()
   }
+
+  // The popups own the Idempotency-Key (one per opening) and throw the axios error back so they show it.
+  async function sendStock(path, body, idempotencyKey, messages) {
+    const res = await http.post(path, body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    // A replay (BL14) answers an earlier identical send: nothing was applied a second time.
+    toast[res.headers['idempotency-replayed'] === 'true' ? 'info' : 'success'](
+      res.headers['idempotency-replayed'] === 'true' ? messages.replayed : messages.done,
+    )
+    setPopup(null)
+    setStockVersion((n) => n + 1)
+  }
+  const receive = (body, key) =>
+    sendStock('/api/stock/receive', body, key, {
+      done: 'Penerimaan stok berhasil dicatat.',
+      replayed: 'Penerimaan ini sudah tercatat sebelumnya. Stok tidak bertambah dua kali.',
+    })
+  const adjust = (body, key) =>
+    sendStock('/api/stock/adjust', body, key, {
+      done: 'Penyesuaian stok berhasil dicatat.',
+      replayed: 'Penyesuaian ini sudah tercatat sebelumnya. Stok tidak berubah dua kali.',
+    })
   const loading = loadedKey !== key
 
   if (!loading && notFound) return <NotFound />
@@ -85,6 +113,16 @@ export default function WarehouseDetail() {
               </span>
             </div>
             <p className="mt-1 text-sm text-base-content/70">{warehouse.address || 'Alamat belum diisi.'}</p>
+            {canWrite && !warehouse.archivedAt && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" className="btn btn-sm btn-primary" onClick={() => setPopup('receive')}>
+                  Terima barang
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => setPopup('adjust')}>
+                  Sesuaikan stok
+                </button>
+              </div>
+            )}
             {isOwner && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {!warehouse.archivedAt && (
@@ -104,8 +142,10 @@ export default function WarehouseDetail() {
             )}
           </div>
           <AssignedUsers users={warehouse.assignedUsers} />
-          <ComingSoonSection title="Stok" message="Daftar stok per produk di gudang ini akan tampil di sini." />
-          <ComingSoonSection title="Riwayat" message="Riwayat pergerakan stok gudang ini akan tampil di sini." />
+          <WarehouseStockSection warehouseId={warehouse.id} archived={Boolean(warehouse.archivedAt)} refreshKey={stockVersion} />
+          <MovementHistorySection scope={{ warehouseId: warehouse.id }} refreshKey={stockVersion} title="Riwayat gudang" />
+          {popup === 'receive' && <StockReceiveModal warehouseId={warehouse.id} onSubmit={receive} onClose={() => setPopup(null)} />}
+          {popup === 'adjust' && <StockAdjustModal warehouseId={warehouse.id} onSubmit={adjust} onClose={() => setPopup(null)} />}
           {popup === 'edit' && <WarehouseFormModal warehouse={warehouse} onSubmit={saveForm} onClose={() => setPopup(null)} />}
           {popup === 'archive' && (
             <ArchiveConfirmModal kind="gudang" name={warehouse.name} restore={Boolean(warehouse.archivedAt)} onConfirm={setArchived} onClose={() => setPopup(null)} />

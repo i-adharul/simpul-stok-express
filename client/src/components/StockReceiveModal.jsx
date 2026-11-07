@@ -76,7 +76,9 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
     }
   }
 
-  const unit = options.products.find((p) => p.id === values.productId)?.unit
+  // An archived product takes no new stock (BL11), so it is not offered here.
+  const activeProducts = options.products.filter((p) => !p.archivedAt)
+  const unit = activeProducts.find((p) => p.id === values.productId)?.unit
 
   return (
     <dialog className="modal modal-open" aria-modal="true" aria-labelledby="receive-title">
@@ -102,7 +104,7 @@ export default function StockReceiveModal({ warehouseId = '', productId = '', on
         </SelectField>
         <SelectField id="receive-product" label="Produk" value={values.productId} onChange={set('productId')} error={errors.productId} disabled={options.loading}>
           <option value="">{options.loading ? 'Memuat...' : 'Pilih produk'}</option>
-          {options.products.map((p) => (
+          {activeProducts.map((p) => (
             <option key={p.id} value={p.id}>
               {p.sku} - {p.name}
             </option>
