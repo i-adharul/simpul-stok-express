@@ -1,5 +1,6 @@
 const { forbidden } = require("../helpers/errors");
 const { can } = require("../helpers/permissions");
+const { tenant } = require("../helpers/tenantScope");
 const idempotencyService = require("../services/idempotencyService");
 const transferService = require("../services/transferService");
 
@@ -36,4 +37,17 @@ async function show(req, res) {
   res.status(200).json(await transferService.getTransferDetail(req.ctx, req.params.id));
 }
 
-module.exports = { create, show };
+// Every ACTIVE warehouse of the organization, not only the caller's assigned ones: the destination
+// of a transfer may be any of them (BL13), while GET /api/warehouses lists just the assigned ones
+// for a Warehouse Admin. Only id, code and name leave the server. The tenant client adds the
+// organization filter.
+async function destinations(req, res) {
+  const rows = await tenant(req.ctx).Warehouse.findAll({
+    where: { archivedAt: null },
+    attributes: ["id", "code", "name"],
+    order: [["code", "ASC"], ["id", "ASC"]],
+  });
+  res.status(200).json({ items: rows.map(({ id, code, name }) => ({ id, code, name })) });
+}
+
+module.exports = { create, show, destinations };

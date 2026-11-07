@@ -33,4 +33,8 @@ const transferSchema = z
     });
   });
 
-module.exports = { transferSchema, MAX_ITEMS };
+// GET /api/stock/transfers/destinations takes no query at all: validate() makes the object strict,
+// so any parameter is a 400.
+const destinationsQuerySchema = z.object({});
+
+module.exports = { transferSchema, destinationsQuerySchema, MAX_ITEMS };

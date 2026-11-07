@@ -278,6 +278,9 @@ const TENANT_ENDPOINTS = [
   },
   // One transfer (E5-05): another organization's id, a missing one, a malformed one and one whose
   // warehouses are out of reach are the same 404. No warehouseScoped: that case is a 404, not a 403.
+  // The destination picker (E5-06): a list of the organization's active warehouses, so A's own
+  // warehouse must appear and B's never (checkList).
+  { method: "get", path: "/api/stock/transfers/destinations", kind: "list", action: "transfer.destinations", ...warehouse },
   { method: "get", path: "/api/stock/transfers/:id", kind: "item", action: "history.read", ...transfer },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", listQuery: { pageSize: 100 }, ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
