@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import ErrorState from '../components/ErrorState'
 import FormField from '../components/FormField'
 import SelectField from '../components/SelectField'
+import TransferConfirmModal from '../components/TransferConfirmModal'
 import { formatNumber } from '../utils/format'
-import { MAX_ITEMS, MAX_NOTE, hasErrors, newRow, validateTransfer } from '../utils/transferForm'
+import http from '../utils/http'
+import { toast } from '../utils/toast'
+import { insufficientProductId } from '../utils/transferErrors'
+import { MAX_ITEMS, MAX_NOTE, buildBody, hasErrors, newRow, validateTransfer } from '../utils/transferForm'
 import { useSourceStock, useWarehouseChoices } from '../utils/useTransferOptions'
 
 function ItemRow({ row, stock, takenIds, errors, onChange, onRemove, disabled }) {
@@ -100,7 +104,9 @@ export default function TransferNew() {
   const choices = useWarehouseChoices()
   const [form, setForm] = useState({ fromWarehouseId: '', toWarehouseId: '', note: '', rows: [newRow()] })
   const [errors, setErrors] = useState({ rows: {} })
+  const [reviewing, setReviewing] = useState(null) // P11 open: a snapshot of the items, so a stock reload cannot blank it
   const source = useSourceStock(form.fromWarehouseId)
+  const navigate = useNavigate()
 
   const from = choices.sources.find((w) => w.id === form.fromWarehouseId)
   const to = choices.destinations.find((w) => w.id === form.toWarehouseId)
@@ -116,10 +122,40 @@ export default function TransferNew() {
   const removeRow = (rowId) => setForm((f) => ({ ...f, rows: f.rows.filter((r) => r.rowId !== rowId) }))
   const addRow = () => setForm((f) => ({ ...f, rows: [...f.rows, newRow()] }))
 
+  const snapshotItems = () =>
+    form.rows.map((row) => {
+      const { product } = source.stock[row.productId]
+      return { productId: row.productId, sku: product.sku, name: product.name, unit: product.unit, quantity: Number(row.quantity) }
+    })
+
   function review() {
     const found = validateTransfer(form, source.stock)
+    // The destination list is read when the screen opens; a warehouse archived since then is gone from it.
+    if (form.toWarehouseId && !found.toWarehouseId && !to) found.toWarehouseId = 'Gudang tujuan sudah tidak aktif. Pilih gudang lain.'
     setErrors(found)
-    return !hasErrors(found)
+    if (!hasErrors(found)) setReviewing(snapshotItems())
+  }
+
+  // P11 sends; a replay (BL14) answers an earlier identical send, so nothing moved a second time.
+  async function send(idempotencyKey) {
+    const res = await http.post('/api/stock/transfers', buildBody(form), { headers: { 'Idempotency-Key': idempotencyKey } })
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Mutasi ini sudah tercatat sebelumnya. Stok tidak dipindahkan dua kali.')
+    else toast.success(`Mutasi ${res.data.code} berhasil dikirim.`)
+    navigate(`/transfers/${res.data.id}`)
+  }
+
+  // A refusal means what S11 shows is stale: mark the product that lacks stock, and read the stock and the
+  // active warehouses again. The user returns to the form with "Periksa lagi".
+  function handleSendFailure(error) {
+    const productId = insufficientProductId(error)
+    if (productId) {
+      const row = form.rows.find((r) => r.productId === productId)
+      if (row) setErrors((e) => ({ ...e, rows: { ...e.rows, [row.rowId]: { quantity: 'Stok tidak mencukupi. Periksa jumlahnya.' } } }))
+    }
+    if (error.response && error.response.status !== 400) {
+      source.reload()
+      choices.reload()
+    }
   }
 
   const blocked = choices.loading || Boolean(choices.error)
@@ -197,6 +233,9 @@ export default function TransferNew() {
         </div>
         <Summary from={from} to={to} rows={form.rows} stock={source.stock} onReview={review} disabled={blocked || source.loading} />
       </div>
+      {reviewing && (
+        <TransferConfirmModal from={from} to={to} items={reviewing} onSend={send} onFailure={handleSendFailure} onClose={() => setReviewing(null)} />
+      )}
     </div>
   )
 }
