@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import ErrorState from '../components/ErrorState'
 import FormField from '../components/FormField'
 import SelectField from '../components/SelectField'
@@ -102,11 +102,37 @@ function Summary({ from, to, rows, stock, onReview, disabled }) {
 // products on offer are the ones that hold stock in the source, with the available quantity beside them.
 export default function TransferNew() {
   const choices = useWarehouseChoices()
-  const [form, setForm] = useState({ fromWarehouseId: '', toWarehouseId: '', note: '', rows: [newRow()] })
+  // "Salin mutasi" on S12 arrives with the earlier transfer in the navigation state (nothing is stored).
+  const copy = useLocation().state?.copy ?? null
+  const [form, setForm] = useState(() =>
+    copy
+      ? {
+          fromWarehouseId: copy.fromWarehouseId,
+          toWarehouseId: copy.toWarehouseId,
+          note: copy.note,
+          rows: copy.items.map((item) => newRow(item.productId, String(item.quantity))),
+        }
+      : { fromWarehouseId: '', toWarehouseId: '', note: '', rows: [newRow()] },
+  )
+  const [copyNotice, setCopyNotice] = useState(copy ? `Disalin dari mutasi ${copy.code}. Periksa gudang, produk, dan jumlah sebelum mengirim.` : null)
   const [errors, setErrors] = useState({ rows: {} })
   const [reviewing, setReviewing] = useState(null) // P11 open: a snapshot of the items, so a stock reload cannot blank it
   const source = useSourceStock(form.fromWarehouseId)
   const navigate = useNavigate()
+
+  // Once the choices are known, a copied warehouse the caller can no longer use (archived, or not assigned to
+  // them) is cleared instead of left as an invisible selection. Done once, while rendering (state derived from
+  // other state), not in an effect.
+  const [reconciled, setReconciled] = useState(false)
+  if (copy && !reconciled && !choices.loading && !choices.error) {
+    setReconciled(true)
+    const fromOk = choices.sources.some((w) => w.id === copy.fromWarehouseId)
+    const toOk = choices.destinations.some((w) => w.id === copy.toWarehouseId)
+    if (!fromOk || !toOk) {
+      setForm((f) => ({ ...f, fromWarehouseId: fromOk ? f.fromWarehouseId : '', toWarehouseId: toOk ? f.toWarehouseId : '', rows: fromOk ? f.rows : [newRow()] }))
+      setCopyNotice(`Disalin dari mutasi ${copy.code}. ${fromOk ? '' : 'Gudang asal tidak bisa Anda pakai lagi. '}${toOk ? '' : 'Gudang tujuan sudah tidak aktif. '}Pilih ulang sebelum mengirim.`)
+    }
+  }
 
   const from = choices.sources.find((w) => w.id === form.fromWarehouseId)
   const to = choices.destinations.find((w) => w.id === form.toWarehouseId)
@@ -171,6 +197,11 @@ export default function TransferNew() {
           Kembali ke riwayat
         </Link>
       </div>
+      {copyNotice && (
+        <div role="status" className="alert alert-info alert-soft">
+          {copyNotice}
+        </div>
+      )}
       {choices.error && <ErrorState message={choices.error} onRetry={choices.reload} />}
       {source.error && <ErrorState message={source.error} onRetry={source.reload} />}
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">

@@ -22,6 +22,7 @@ export function validateTransfer({ fromWarehouseId, toWarehouseId, note, rows },
     const rowErrors = {}
     if (!row.productId) rowErrors.productId = 'Pilih produk.'
     else if (seen.has(row.productId)) rowErrors.productId = 'Produk sudah ada di daftar.'
+    else if (!stock[row.productId]) rowErrors.productId = 'Produk ini tidak punya stok di gudang asal.'
     seen.add(row.productId)
     const quantity = Number(row.quantity)
     if (!/^\d+$/.test(row.quantity.trim()) || quantity < 1 || quantity > MAX_QUANTITY) {
