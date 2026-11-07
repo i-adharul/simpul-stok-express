@@ -51,7 +51,8 @@ function serverErrors(error) {
   return { general: errorText(error) ?? GENERIC_ERROR }
 }
 
-// P05. The current quantity of the chosen pair is read from GET /api/stock (no row means 0), so the popup
+// P05. An archived product is offered too, marked "Diarsipkan": the API allows adjusting it so leftover stock
+// can be brought to zero (BL12). The current quantity of the chosen pair is read from GET /api/stock (no row means 0), so the popup
 // can show the result before saving and refuse a negative one. `onSubmit(body, idempotencyKey)` does the
 // request and rejects with the axios error. The key works as in P04: one per opening, new when a field changes.
 export default function StockAdjustModal({ warehouseId = '', productId = '', onSubmit, onClose }) {
@@ -140,6 +141,7 @@ export default function StockAdjustModal({ warehouseId = '', productId = '', onS
           {options.products.map((p) => (
             <option key={p.id} value={p.id}>
               {p.sku} - {p.name}
+              {p.archivedAt ? ' (Diarsipkan)' : ''}
             </option>
           ))}
         </SelectField>

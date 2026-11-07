@@ -29,6 +29,16 @@ function SummaryCard({ label, value, tone }) {
   )
 }
 
+// The pair rows of a product at the edge of a page may continue on the next or previous page, so its
+// total and status are not known from this page alone.
+function Unknown() {
+  return (
+    <span className="text-base-content/40" title="Lanjut di halaman lain">
+      …
+    </span>
+  )
+}
+
 // A warehouse cell: the quantity, or a strip when the pair has no stock row (nothing was ever received).
 function Cell({ cell, unit, unknown }) {
   if (cell) {
@@ -38,7 +48,7 @@ function Cell({ cell, unit, unknown }) {
       </span>
     )
   }
-  if (unknown) return <span className="text-base-content/40" title="Lanjut di halaman lain">…</span>
+  if (unknown) return <Unknown />
   return <span className="text-base-content/40" title="Belum ada stok di gudang ini">—</span>
 }
 
@@ -59,14 +69,20 @@ function StockRow({ group, warehouses, unknown }) {
         </td>
       ))}
       <td className="text-right font-semibold">
-        {formatNumber(group.total)} {product.unit}
+        {unknown ? <Unknown /> : `${formatNumber(group.total)} ${product.unit}`}
       </td>
       <td className="text-right text-base-content/70">
         {formatNumber(product.minStock)} {product.unit}
       </td>
       <td>
-        <span className={`badge badge-soft ${STATUS_BADGE[group.worst]}`}>{STATUS_LABELS[group.worst]}</span>
-        {group.worst !== 'OK' && <div className="text-xs text-base-content/60">di {group.badWarehouses} gudang</div>}
+        {unknown ? (
+          <Unknown />
+        ) : (
+          <>
+            <span className={`badge badge-soft ${STATUS_BADGE[group.worst]}`}>{STATUS_LABELS[group.worst]}</span>
+            {group.worst !== 'OK' && <div className="text-xs text-base-content/60">di {group.badWarehouses} gudang</div>}
+          </>
+        )}
       </td>
     </tr>
   )
@@ -250,7 +266,7 @@ export default function StockSummary() {
                     key={group.product.id}
                     group={group}
                     warehouses={columns}
-                    unknown={group.product.id === firstCut || group.product.id === lastCut}
+                    unknown={columns.length > 1 && (group.product.id === firstCut || group.product.id === lastCut)}
                   />
                 ))}
               </tbody>
