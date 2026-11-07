@@ -5,7 +5,7 @@ import http from './http'
 const PAGE_SIZE = 100 // the API maximum
 
 // Reads every page of a list endpoint, so a plan with more than 100 rows still gets all its choices.
-async function fetchAll(url, params, signal) {
+export async function fetchAll(url, params, signal) {
   const items = []
   for (let page = 1; ; page += 1) {
     const { data } = await http.get(url, { params: { ...params, page, pageSize: PAGE_SIZE }, signal })

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import MovementDetailDrawer from '../components/MovementDetailDrawer'
+import { useAuth } from '../context/authContext'
 import { ROLE_LABELS } from '../constants/navigation'
 import { MOVEMENT_TYPES } from '../constants/stock'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
@@ -79,6 +80,10 @@ function ItemsTable({ items, onOpen }) {
 // shown as the 404 page.
 export default function TransferDetail() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  // Owner and Warehouse Admin may transfer (the API checks again); a Viewer only reads.
+  const canCopy = user?.role === 'OWNER' || user?.role === 'WAREHOUSE_ADMIN'
   const [state, setState] = useState({ transfer: null, error: null, notFound: false })
   const [attempt, setAttempt] = useState(0)
   const [loadedKey, setLoadedKey] = useState(null)
@@ -101,6 +106,20 @@ export default function TransferDetail() {
     return () => controller.abort()
   }, [id, attempt, key])
 
+  // S11 opens filled with this transfer. Only the ids, quantities and note travel; S11 checks the stock again.
+  const copyTransfer = () =>
+    navigate('/transfers/new', {
+      state: {
+        copy: {
+          code: transfer.code,
+          fromWarehouseId: transfer.fromWarehouse.id,
+          toWarehouseId: transfer.toWarehouse.id,
+          note: transfer.note ?? '',
+          items: transfer.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+        },
+      },
+    })
+
   const closeDrawer = useCallback(() => setSelected(null), [])
   const { transfer, error, notFound } = state
   const loading = loadedKey !== key
@@ -122,6 +141,11 @@ export default function TransferDetail() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold">Mutasi stok {transfer.code}</h1>
             <span className="badge badge-soft badge-success">Selesai</span>
+            {canCopy && (
+              <button type="button" className="btn btn-sm" onClick={copyTransfer}>
+                Salin mutasi
+              </button>
+            )}
           </div>
           <p className="text-sm text-base-content/70">
             {formatDateTime(transfer.createdAt)} • Dibuat oleh:{' '}
