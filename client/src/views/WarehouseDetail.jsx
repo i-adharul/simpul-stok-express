@@ -6,6 +6,7 @@ import ComingSoonSection from '../components/ComingSoonSection'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import WarehouseFormModal from '../components/WarehouseFormModal'
+import WarehouseStockSection from '../components/WarehouseStockSection'
 import { useAuth } from '../context/authContext'
 import { ROLE_LABELS } from '../constants/navigation'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
@@ -104,7 +105,7 @@ export default function WarehouseDetail() {
             )}
           </div>
           <AssignedUsers users={warehouse.assignedUsers} />
-          <ComingSoonSection title="Stok" message="Daftar stok per produk di gudang ini akan tampil di sini." />
+          <WarehouseStockSection warehouseId={warehouse.id} archived={Boolean(warehouse.archivedAt)} />
           <ComingSoonSection title="Riwayat" message="Riwayat pergerakan stok gudang ini akan tampil di sini." />
           {popup === 'edit' && <WarehouseFormModal warehouse={warehouse} onSubmit={saveForm} onClose={() => setPopup(null)} />}
           {popup === 'archive' && (
