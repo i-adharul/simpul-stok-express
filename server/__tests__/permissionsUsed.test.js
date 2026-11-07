@@ -15,7 +15,6 @@ const { TENANT_ENDPOINTS } = require("./support/registry");
 // not listed (add the route, or list it with a reason).
 const PLANNED = {
   "subscription.manage": "billing endpoints (M2, E8)",
-  "transfer.destinations": "E5-06 transfer destinations endpoint",
 };
 
 function usedActions(expressApp, endpoints) {

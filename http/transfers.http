@@ -96,3 +96,10 @@ Content-Type: application/json
 @transferId = paste-the-id-of-a-transfer-here
 GET {{baseUrl}}/api/stock/transfers/{{transferId}}
 Authorization: Bearer {{token}}
+
+### Transfer destinations (Owner or Warehouse Admin; a Viewer gets 403)
+# Every ACTIVE warehouse of the organization, ordered by code: { items: [{ id, code, name }] }.
+# A Warehouse Admin sees all of them here, not only the assigned ones (the destination may be any).
+# No query parameters: any parameter is a 400 VALIDATION_ERROR.
+GET {{baseUrl}}/api/stock/transfers/destinations
+Authorization: Bearer {{token}}

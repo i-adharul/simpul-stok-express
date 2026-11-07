@@ -2,13 +2,13 @@ const express = require("express");
 const stockController = require("../controllers/stockController");
 const transferController = require("../controllers/transferController");
 const authentication = require("../middlewares/authentication");
-const { requireRole } = require("../middlewares/authorization");
+const { requireCan, requireRole } = require("../middlewares/authorization");
 const idempotencyKey = require("../middlewares/idempotencyKey");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
 const { receiveSchema, adjustSchema, stockListQuerySchema, movementListQuerySchema } = require("../schemas/stock.schema");
-const { transferSchema } = require("../schemas/transfer.schema");
+const { transferSchema, destinationsQuerySchema } = require("../schemas/transfer.schema");
 
 const router = express.Router();
 
@@ -70,8 +70,18 @@ router.post(
   transferController.create,
 );
 
+// The destination picker (S11). Organization-level: a Warehouse Admin may pick any active warehouse,
+// so there is no warehouse to judge. Declared BEFORE "/stock/transfers/:id", or ":id" takes it.
+router.get(
+  "/stock/transfers/destinations",
+  authentication,
+  requireCan("transfer.destinations"),
+  validate({ query: destinationsQuerySchema }),
+  transferController.destinations,
+);
+
 // One transfer (S12). No schema: a malformed ID is a 404 from the service, like every ID in a URL
-// (rule 2). Fixed paths under /stock/transfers must be declared BEFORE this one, or ":id" takes them.
+// (rule 2). The fixed path above must stay before this one.
 router.get("/stock/transfers/:id", authentication, requireRole("history.read"), transferController.show);
 
 module.exports = router;
