@@ -13,6 +13,7 @@ import Warehouses from './views/Warehouses'
 import Products from './views/Products'
 import WarehouseDetail from './views/WarehouseDetail'
 import ProductDetail from './views/ProductDetail'
+import TransferDetail from './views/TransferDetail'
 import NotFound from './views/NotFound'
 import Forbidden from './views/Forbidden'
 import ServerError from './views/ServerError'
@@ -58,6 +59,7 @@ function App() {
               <Route path="warehouses/:id" element={<WarehouseDetail />} />
               <Route path="products" element={<Products />} />
               <Route path="products/:id" element={<ProductDetail />} />
+              <Route path="transfers/:id" element={<TransferDetail />} />
               <Route path="dashboard" element={<StatesPreview />} />
               <Route path="not-found" element={<NotFound />} />
               <Route path="forbidden" element={<Forbidden />} />
