@@ -6,7 +6,8 @@
   "scripts": {
     "test": "jest --runInBand",
     "dev": "nodemon bin/www.js",
-    "start": "node bin/www.js"
+    "start": "node bin/www.js",
+    "demo:reset": "node scripts/resetDemo.js"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
