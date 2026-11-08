@@ -1,4 +1,4 @@
-const { Op, fn, col } = require("sequelize");
+const { Op, fn, col, literal } = require("sequelize");
 const { wibDayRange } = require("../helpers/wibDay");
 const { tenant } = require("../helpers/tenantScope");
 const { STATUS_FILTERS } = require("./stockSummaryService");
@@ -50,4 +50,88 @@ async function getSummary(ctx, now = new Date()) {
   return { totalProducts, totalUnits, lowCount, outCount, movementsToday };
 }
 
-module.exports = { getSummary };
+const RESTOCK_LIMIT = 5;
+const ACTIVITY_LIMIT = 5;
+
+// Pairs that are OUT or LOW, as the stock summary defines them (one definition, STATUS_FILTERS).
+const needsRestock = (ctx) => ({ [Op.and]: [reachable(ctx), { [Op.or]: [STATUS_FILTERS.OUT(), STATUS_FILTERS.LOW()] }] });
+
+const restockIncludes = (ctx) => [
+  { ...activeProduct(ctx), attributes: ["id", "sku", "name", "unit", "minStock"] },
+  { association: "Warehouse", required: true, where: { organizationId: ctx.organizationId }, attributes: ["id", "code", "name"] },
+];
+
+const toRestockItem = (row) => ({
+  warehouse: { id: row.Warehouse.id, code: row.Warehouse.code, name: row.Warehouse.name },
+  product: { id: row.Product.id, sku: row.Product.sku, name: row.Product.name, unit: row.Product.unit, minStock: row.Product.minStock },
+  quantity: row.quantity,
+  status: row.quantity === 0 ? "OUT" : "LOW",
+});
+
+// Returns `restock` of GET /api/dashboard: the 5 pairs furthest below their minimum, and how many
+// pairs are short in all. The gap is minStock - quantity; ties are broken by name, then code, then
+// ids, so two calls never answer in a different order.
+async function getRestock(ctx) {
+  const levels = tenant(ctx).StockLevel;
+  const [rows, total] = await Promise.all([
+    levels.findAll({
+      where: needsRestock(ctx),
+      include: restockIncludes(ctx),
+      order: [
+        [literal('"Product"."minStock" - "StockLevel"."quantity"'), "DESC"],
+        [col("Product.name"), "ASC"],
+        [col("Warehouse.code"), "ASC"],
+        ["warehouseId", "ASC"],
+        ["productId", "ASC"],
+      ],
+      limit: RESTOCK_LIMIT,
+    }),
+    levels.count({ where: needsRestock(ctx), include: [activeProduct(ctx)] }),
+  ]);
+  return { items: rows.map(toRestockItem), total };
+}
+
+const uniqueIds = (rows, key) => [...new Set(rows.map((row) => row[key]).filter(Boolean))];
+
+// The names around the movements are read with separate scoped queries, not an include (ADR 0011);
+// the email of a user is never selected.
+async function namesOf(ctx, movements) {
+  const scoped = tenant(ctx);
+  const byIds = (Model, key, attributes) =>
+    scoped[Model].findAll({ where: { id: { [Op.in]: uniqueIds(movements, key) } }, attributes });
+  const [warehouses, products, users, transfers] = await Promise.all([
+    byIds("Warehouse", "warehouseId", ["id", "code", "name"]),
+    byIds("Product", "productId", ["id", "sku", "name", "unit"]),
+    byIds("User", "createdById", ["id", "name"]),
+    byIds("StockTransfer", "transferId", ["id", "code"]),
+  ]);
+  const index = (rows) => new Map(rows.map((row) => [row.id, row]));
+  return { warehouses: index(warehouses), products: index(products), users: index(users), transfers: index(transfers) };
+}
+
+const pick = (row, keys) => Object.fromEntries(keys.map((key) => [key, row[key]]));
+
+// Returns `recentActivity` of GET /api/dashboard: the 5 newest movements of the caller's warehouses,
+// newest first (same order as the history, createdAt DESC then id ASC). Both movements of a transfer
+// can show.
+async function getRecentActivity(ctx) {
+  const movements = await tenant(ctx).StockMovement.findAll({
+    where: reachable(ctx),
+    order: [["createdAt", "DESC"], ["id", "ASC"]],
+    limit: ACTIVITY_LIMIT,
+  });
+  const names = await namesOf(ctx, movements);
+  return movements.map((m) => ({
+    id: m.id,
+    type: m.type,
+    quantityDelta: m.quantityDelta,
+    reason: m.reason,
+    createdAt: m.createdAt,
+    warehouse: pick(names.warehouses.get(m.warehouseId), ["id", "code", "name"]),
+    product: pick(names.products.get(m.productId), ["id", "sku", "name", "unit"]),
+    createdBy: m.createdById ? pick(names.users.get(m.createdById), ["id", "name"]) : null,
+    transfer: m.transferId ? pick(names.transfers.get(m.transferId), ["id", "code"]) : null,
+  }));
+}
+
+module.exports = { getSummary, getRestock, getRecentActivity, RESTOCK_LIMIT, ACTIVITY_LIMIT };
