@@ -134,4 +134,11 @@ async function getRecentActivity(ctx) {
   }));
 }
 
-module.exports = { getSummary, getRestock, getRecentActivity, RESTOCK_LIMIT, ACTIVITY_LIMIT };
+// The body of GET /api/dashboard. Four independent reads, run together; a read-only answer needs no
+// transaction (the figures may differ by one concurrent write, which a dashboard accepts).
+async function getDashboard(ctx, now = new Date()) {
+  const [summary, restock, recentActivity] = await Promise.all([getSummary(ctx, now), getRestock(ctx), getRecentActivity(ctx)]);
+  return { summary, restock, recentActivity };
+}
+
+module.exports = { getDashboard, getSummary, getRestock, getRecentActivity, RESTOCK_LIMIT, ACTIVITY_LIMIT };

@@ -41,6 +41,8 @@ const rawCount = (table) => async (organizationId) =>
     }))[0][0].n,
   );
 
+let dashboardGap = 0;
+
 const warehouse = {
   createRow: async (world, organization) => ({ id: await world.createWarehouse(organization) }),
   readRow: rawRow("Warehouses"),
@@ -179,6 +181,28 @@ const TENANT_ENDPOINTS = [
       const warehouseId = await world.createWarehouse(organization);
       const productId = await world.createProduct(organization);
       await createStockLevel(world.organizations[organization], warehouseId, productId, 5);
+      return { id: warehouseId };
+    },
+    readRow: rawRow("Warehouses"),
+  },
+  // The dashboard (E6-01). The answer shows warehouse ids in `restock` and `recentActivity`, so
+  // `createRow` makes a warehouse with an OUT pair and returns the WAREHOUSE id. `restock` holds
+  // only 5 pairs, so every new product needs a larger minimum than the one before: the newest pair
+  // is then the furthest below its minimum and is always on the list. No warehouseScoped: the
+  // endpoint has no warehouse input, a Viewer simply sees the figures of the assigned ones.
+  {
+    method: "get",
+    path: "/api/dashboard",
+    kind: "list",
+    action: "stock.read",
+    createRow: async (world, organization) => {
+      const warehouseId = await world.createWarehouse(organization);
+      const productId = await world.createProduct(organization);
+      dashboardGap += 1;
+      await getSequelize().query(`UPDATE "Products" SET "minStock" = :minStock WHERE id = :productId`, {
+        replacements: { minStock: 1000 + dashboardGap, productId },
+      });
+      await createStockLevel(world.organizations[organization], warehouseId, productId, 0);
       return { id: warehouseId };
     },
     readRow: rawRow("Warehouses"),
