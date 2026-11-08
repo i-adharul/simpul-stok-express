@@ -55,3 +55,30 @@ export function wibNextDayStart(day) {
   const [y, m, d] = day.split('-').map(Number)
   return wibDayStart(new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10))
 }
+
+const longDateFormat = new Intl.DateTimeFormat('id-ID', {
+  timeZone: TIME_ZONE,
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
+const hourFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: 'numeric', hourCycle: 'h23' })
+
+// "Kamis, 24 Oktober 2024" (WIB)
+export function formatLongDate(value) {
+  const date = toDate(value)
+  return date ? longDateFormat.format(date) : ''
+}
+
+// Greeting by the hour in WIB, not the hour of the browser's own time zone.
+export function greetingFor(value) {
+  const date = toDate(value)
+  if (!date) return 'Selamat datang'
+  const hour = Number(hourFormat.format(date))
+  if (hour < 11) return 'Selamat pagi'
+  if (hour < 15) return 'Selamat siang'
+  if (hour < 18) return 'Selamat sore'
+  return 'Selamat malam'
+}
