@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
+import ErrorState from '../components/ErrorState'
 import { useAuth } from '../context/authContext'
 
 const BENEFITS = [
@@ -57,7 +58,7 @@ function BrandPanel() {
 // S01. Public route. Shows the API error under the password field; the same text is used for a
 // wrong email and a wrong password on purpose (the API does not reveal which one was wrong).
 export default function Login() {
-  const { user, loading, login } = useAuth()
+  const { user, loading, connectionFailed, retrySession, login } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -89,6 +90,8 @@ export default function Login() {
         <div className="w-full max-w-115 rounded-xl border border-base-300 bg-base-100 p-8 lg:p-10">
           <h2 className="text-2xl font-bold tracking-tight">Masuk ke Simpul</h2>
           <p className="mt-1 text-sm text-base-content/70">Kelola operasional dan stok cabang bisnis Anda.</p>
+
+          {connectionFailed && <ErrorState message="Server tidak dapat dihubungi. Coba lagi." onRetry={retrySession} />}
 
           <form className="mt-7 space-y-5" onSubmit={handleSubmit} noValidate>
             <div className="space-y-1.5">
