@@ -12,6 +12,10 @@ export function AuthProvider({ children }) {
   const [sessionExpired, setSessionExpired] = useState(false)
   // True while the stored token is being checked on app start, so routes do not flash the login page.
   const [loading, setLoading] = useState(() => Boolean(getToken()))
+  // True when the stored token could not be checked because the server did not answer (network or 5xx).
+  // The token is kept, so the login screen can say what happened and offer a retry.
+  const [connectionFailed, setConnectionFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!getToken()) return undefined
@@ -19,11 +23,15 @@ export function AuthProvider({ children }) {
     http
       .get('/api/me')
       .then(({ data }) => {
-        if (!cancelled) setSession({ user: data.user, organization: data.organization })
+        if (cancelled) return
+        setSession({ user: data.user, organization: data.organization })
+        setConnectionFailed(false)
       })
       .catch((error) => {
-        // Only a 401 means the token is bad. A network error keeps the token so a reload can retry.
-        if (!cancelled && error.response?.status === 401) setToken(null)
+        if (cancelled) return
+        // Only a 401 means the token is bad. A network error keeps the token so a retry can work.
+        if (error.response?.status === 401) setToken(null)
+        else setConnectionFailed(true)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -31,6 +39,12 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
+  }, [attempt])
+
+  const retrySession = useCallback(() => {
+    setConnectionFailed(false)
+    setLoading(true)
+    setAttempt((n) => n + 1)
   }, [])
 
   useEffect(
@@ -53,6 +67,7 @@ export function AuthProvider({ children }) {
     const me = await http.get('/api/me')
     setSession({ user: me.data.user, organization: me.data.organization })
     setSessionExpired(false)
+    setConnectionFailed(false)
     return data.redirectTo
   }, [])
 
@@ -67,8 +82,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ ...session, loading, sessionExpired, dismissSessionExpired, login, logout }),
-    [session, loading, sessionExpired, dismissSessionExpired, login, logout],
+    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, logout }),
+    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
