@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { useAuth } from '../context/authContext'
 import { ROLE_LABELS, visibleNav } from '../constants/navigation'
 
@@ -51,7 +52,10 @@ function Sidebar({ user, onNavigate }) {
   )
 }
 
-// Layout route: the sidebar and top bar stay, <Outlet /> is replaced by the current view.
+// Layout route: the sidebar and top bar stay, {/* The boundary sits inside the layout so a crashing screen leaves the sidebar and top bar usable. */}
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary> is replaced by the current view.
 // The user comes from AuthContext; ProtectedRoute guarantees there is one.
 export default function BaseLayout() {
   const { user: authUser, organization, logout } = useAuth()
@@ -95,7 +99,10 @@ export default function BaseLayout() {
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <div className="mx-auto w-full max-w-300">
-            <Outlet />
+            {/* The boundary sits inside the layout so a crashing screen leaves the sidebar and top bar usable. */}
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
