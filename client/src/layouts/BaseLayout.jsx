@@ -52,10 +52,7 @@ function Sidebar({ user, onNavigate }) {
   )
 }
 
-// Layout route: the sidebar and top bar stay, {/* The boundary sits inside the layout so a crashing screen leaves the sidebar and top bar usable. */}
-            <ErrorBoundary>
-              <Outlet />
-            </ErrorBoundary> is replaced by the current view.
+// Layout route: the sidebar and top bar stay, <Outlet /> is replaced by the current view.
 // The user comes from AuthContext; ProtectedRoute guarantees there is one.
 export default function BaseLayout() {
   const { user: authUser, organization, logout } = useAuth()
