@@ -3,11 +3,14 @@ import { Link } from 'react-router'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import StockAdjustModal from '../components/StockAdjustModal'
+import StockReceiveModal from '../components/StockReceiveModal'
 import { MOVEMENT_TYPES } from '../constants/stock'
 import { useAuth } from '../context/authContext'
 import { errorText, GENERIC_ERROR } from '../utils/apiError'
 import { formatDateTime, formatLongDate, formatNumber, greetingFor } from '../utils/format'
 import http from '../utils/http'
+import { toast } from '../utils/toast'
 
 const STATUS_BADGE = { OUT: 'badge-error', LOW: 'badge-warning' }
 const STATUS_TEXT = { OUT: 'text-error', LOW: 'text-warning' }
@@ -145,6 +148,12 @@ function ActivityCard({ items }) {
           ))}
         </ul>
       )}
+      <div className="border-t border-base-300 p-4 text-center text-sm">
+        {/* S10 for every role for now; the Owner goes to the audit log (S18) once that screen exists. */}
+        <Link to="/movements" className="link link-primary font-semibold">
+          Lihat log aktivitas lengkap
+        </Link>
+      </div>
     </section>
   )
 }
@@ -153,6 +162,9 @@ function ActivityCard({ items }) {
 // warehouses the caller may see.
 export default function Dashboard() {
   const { user } = useAuth()
+  const canWrite = user?.role === 'OWNER' || user?.role === 'WAREHOUSE_ADMIN'
+  // Which stock popup is open: 'receive' (P04), 'adjust' (P05) or null
+  const [popup, setPopup] = useState(null)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -180,14 +192,45 @@ export default function Dashboard() {
     setAttempt((n) => n + 1)
   }, [])
 
+  // The popup owns the idempotency key (one per opening) and throws the axios error back so it shows it.
+  async function receive(body, idempotencyKey) {
+    const res = await http.post('/api/stock/receive', body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Penerimaan ini sudah tercatat sebelumnya. Stok tidak bertambah dua kali.')
+    else toast.success('Penerimaan stok berhasil dicatat.')
+    setPopup(null)
+    retry()
+  }
+
+  async function adjust(body, idempotencyKey) {
+    const res = await http.post('/api/stock/adjust', body, { headers: { 'Idempotency-Key': idempotencyKey } })
+    if (res.headers['idempotency-replayed'] === 'true') toast.info('Penyesuaian ini sudah tercatat sebelumnya. Stok tidak berubah dua kali.')
+    else toast.success('Penyesuaian stok berhasil dicatat.')
+    setPopup(null)
+    retry()
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">
-          {greetingFor(now)}, {user?.name?.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-base-content/70">{formatLongDate(now)} • Ringkasan operasional</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">
+            {greetingFor(now)}, {user?.name?.split(' ')[0]}
+          </h1>
+          <p className="text-sm text-base-content/70">{formatLongDate(now)} • Ringkasan operasional</p>
+        </div>
+        {canWrite && (
+          <div className="flex gap-2">
+            <button type="button" className="btn" onClick={() => setPopup('adjust')}>
+              Sesuaikan stok
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setPopup('receive')}>
+              Terima barang
+            </button>
+          </div>
+        )}
       </div>
+      {popup === 'receive' && <StockReceiveModal onSubmit={receive} onClose={() => setPopup(null)} />}
+      {popup === 'adjust' && <StockAdjustModal onSubmit={adjust} onClose={() => setPopup(null)} />}
 
       {error && <ErrorState message={error} onRetry={retry} />}
       {!error && !data && <LoadingSkeleton rows={4} />}
