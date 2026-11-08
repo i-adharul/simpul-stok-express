@@ -93,4 +93,4 @@ async function listStock(ctx, query) {
   return { items: rows.map(toItem), total, page: query.page, pageSize: query.pageSize, summary: { out, low, ok } };
 }
 
-module.exports = { listStock };
+module.exports = { listStock, STATUS_FILTERS };
