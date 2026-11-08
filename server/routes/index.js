@@ -1,5 +1,6 @@
 const express = require("express");
 const auth = require("./auth");
+const dashboard = require("./dashboard");
 const health = require("./health");
 const me = require("./me");
 const products = require("./products");
@@ -14,5 +15,6 @@ router.use(me);
 router.use(warehouses);
 router.use(products);
 router.use(stock);
+router.use(dashboard);
 
 module.exports = router;

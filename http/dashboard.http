@@ -1,0 +1,21 @@
+### Dashboard (E6-01). Local server: cd server && npm run dev
+# Needs the seed: cd server && npx sequelize db:seed:all
+# Log in first (http/auth.http); the token goes into @token below. Every tenant role may call it.
+@token = paste-the-token-here
+@baseUrl = http://localhost:3000
+
+### Dashboard (any tenant role)
+# Expect 200 with Cache-Control: no-store and the body
+#   { summary: { totalProducts, totalUnits, lowCount, outCount, movementsToday },
+#     restock: { items: [{ warehouse, product, quantity, status: "OUT" | "LOW" }] (at most 5, furthest below minStock first), total },
+#     recentActivity: [{ id, type, quantityDelta, reason, createdAt, warehouse, product, createdBy | null, transfer | null }] (5 newest) }.
+# totalProducts counts the active products of the whole organization; every other figure covers only
+# the caller's warehouses (an Owner has all active ones; a Warehouse Admin or Viewer the assigned ones).
+# "Today" is the WIB calendar day. A transfer writes two movements, so it counts twice in movementsToday.
+# 401 UNAUTHENTICATED: no or a bad token. 403 FORBIDDEN: a platform admin.
+GET {{baseUrl}}/api/dashboard
+Authorization: Bearer {{token}}
+
+### No token
+# Expect 401 UNAUTHENTICATED
+GET {{baseUrl}}/api/dashboard
