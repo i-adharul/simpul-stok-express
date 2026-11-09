@@ -71,6 +71,17 @@ export function AuthProvider({ children }) {
     return data.redirectTo
   }, [])
 
+  // Sign-up (S02): the API answers like login (a token and redirectTo), so the session starts the same way.
+  const registerOrganization = useCallback(async (payload) => {
+    const { data } = await http.post('/api/auth/register-organization', payload)
+    setToken(data.token)
+    const me = await http.get('/api/me')
+    setSession({ user: me.data.user, organization: me.data.organization })
+    setSessionExpired(false)
+    setConnectionFailed(false)
+    return data.redirectTo
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await http.post('/api/auth/logout') // the server keeps no session; this call is only a courtesy
@@ -82,8 +93,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, logout }),
-    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, logout],
+    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, logout }),
+    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

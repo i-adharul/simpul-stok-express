@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import FormField from '../components/FormField'
+import { useAuth } from '../context/authContext'
+import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
 import { PASSWORD_HINT, suggestSlug, validateOrganization, validateOwner } from '../utils/registerForm'
 
 const STEPS = [
@@ -69,7 +71,7 @@ function OrganizationStep({ values, errors, onChange, onNext }) {
 }
 
 // S02, step 2 of 2: the Owner account. "Kembali" only changes the step; the values stay in the parent.
-function OwnerStep({ values, errors, onChange, onBack, onSubmit }) {
+function OwnerStep({ values, errors, formError, submitting, onChange, onBack, onSubmit }) {
   const [showPassword, setShowPassword] = useState(false)
   return (
     <form className="space-y-5" noValidate onSubmit={onSubmit}>
@@ -127,12 +129,17 @@ function OwnerStep({ values, errors, onChange, onBack, onSubmit }) {
       <p className="rounded-lg border border-base-300 bg-base-200 p-3 text-xs text-base-content/70">
         Akun ini otomatis menjadi pengelola utama (Owner) untuk <strong>{values.organizationName.trim()}</strong>.
       </p>
+      {formError && (
+        <p role="alert" className="text-sm font-medium text-error">
+          {formError}
+        </p>
+      )}
       <div className="flex items-center gap-3">
-        <button type="button" className="btn" onClick={onBack}>
+        <button type="button" className="btn" onClick={onBack} disabled={submitting}>
           Kembali
         </button>
-        <button type="submit" className="btn btn-primary flex-1">
-          Daftarkan akun
+        <button type="submit" className="btn btn-primary flex-1" disabled={submitting}>
+          {submitting ? <span className="loading loading-spinner loading-sm" /> : 'Daftarkan akun'}
         </button>
       </div>
       <p className="text-center text-xs text-base-content/70">
@@ -147,7 +154,11 @@ function OwnerStep({ values, errors, onChange, onBack, onSubmit }) {
 
 // S02. Public route. All input lives here, so going back from step 2 keeps what was typed.
 export default function Register() {
+  const { user, loading, registerOrganization } = useAuth()
+  const navigate = useNavigate()
   const [step, setStep] = useState(1)
+  const [formError, setFormError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const [slugEdited, setSlugEdited] = useState(false)
   const [values, setValues] = useState({ organizationName: '', slug: '', name: '', email: '', password: '', passwordConfirm: '' })
   const [errors, setErrors] = useState({})
@@ -169,11 +180,35 @@ export default function Register() {
     if (Object.keys(found).length === 0) setStep(2)
   }
 
-  function handleSubmit(event) {
+  // A 409 or 400 from the API lands on the field it names. A clash on the slug sends the user back to
+  // step 1, because that field lives there.
+  function showServerError(error) {
+    const fields = fieldErrorsFrom(error)
+    setErrors(fields)
+    if (fields.slug || fields.organizationName) setStep(1)
+    if (Object.keys(fields).length === 0) setFormError(errorText(error) ?? GENERIC_ERROR)
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault()
+    if (submitting) return
     const found = validateOwner(values)
     setErrors(found)
+    setFormError(null)
+    if (Object.keys(found).length > 0) return
+    setSubmitting(true)
+    try {
+      const { organizationName, slug, name, email, password } = values
+      const redirectTo = await registerOrganization({ organizationName: organizationName.trim(), slug, name: name.trim(), email: email.trim(), password })
+      navigate(redirectTo, { replace: true })
+    } catch (error) {
+      showServerError(error)
+      setSubmitting(false)
+    }
   }
+
+  // Someone who is already logged in has no business here.
+  if (!loading && user) return <Navigate to="/dashboard" replace />
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-base-200 px-6 py-10">
@@ -187,7 +222,7 @@ export default function Register() {
         <p className="mb-6 mt-1 text-sm text-base-content/70">Mulai kelola stok multi-cabang dengan platform terpusat.</p>
         <StepIndicator current={step} />
         {step === 1 && <OrganizationStep values={values} errors={errors} onChange={handleChange} onNext={handleNext} />}
-        {step === 2 && <OwnerStep values={values} errors={errors} onChange={handleChange} onBack={() => setStep(1)} onSubmit={handleSubmit} />}
+        {step === 2 && <OwnerStep values={values} errors={errors} formError={formError} submitting={submitting} onChange={handleChange} onBack={() => setStep(1)} onSubmit={handleSubmit} />}
       </div>
     </main>
   )
