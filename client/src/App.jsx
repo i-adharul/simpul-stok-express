@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import SessionExpiredModal from './components/SessionExpiredModal'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
+import Register from './views/Register'
 import Profile from './views/Profile'
 import StockSummary from './views/StockSummary'
 import Movements from './views/Movements'
@@ -27,6 +28,7 @@ function App() {
       <ErrorBoundary>
         <Routes>
           <Route path="login" element={<Login />} />
+          <Route path="register" element={<Register />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<BaseLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
