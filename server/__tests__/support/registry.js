@@ -339,6 +339,23 @@ const TENANT_ENDPOINTS = [
   // Members (E7-05): A's list must show A's users and never B's. Platform admins have no organization
   // and so can never be listed.
   { method: "get", path: "/api/members", kind: "list", action: "member.manage", listQuery: { pageSize: 100 }, ...member },
+  // Change a member (E7-08): the row in the URL is a user of the organization. A warehouse of B in the
+  // body is answered exactly like a random UUID (404). The target is a Viewer, never the Owner.
+  {
+    method: "patch",
+    path: "/api/members/:id",
+    kind: "item",
+    action: "member.manage",
+    body: () => ({ role: "WAREHOUSE_ADMIN" }),
+    foreignBodies: [
+      {
+        key: "warehouseIds",
+        createForeign: async (world) => ({ id: await world.createWarehouse("B") }),
+        body: (world, id) => ({ warehouseIds: [id] }),
+      },
+    ],
+    ...member,
+  },
   // Invitations (E7-04). The harness cannot see the token, only the rows: A's list must never show
   // B's invitation, B's invitation cannot be cancelled by A, and a warehouse of B in the body is
   // answered exactly like a random UUID (404).
