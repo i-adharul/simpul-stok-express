@@ -12,8 +12,8 @@ The numbers below are reserved from the start so that other documents can refer 
 | 0004 | Sequelize 6 and `sequelize-cli` for migrations and seeders                               | accepted | E0-04 |
 | 0005 | Immutable stock movements enforced by a database trigger                                 | accepted | E0-05 |
 | 0006 | Tenant integrity enforced by the application, not composite foreign keys                 | accepted | E0-05 |
-| 0007 | Supabase connection strategy (direct or session mode for migrations and locks)           | planned  | E6-04 |
-| 0008 | Deployment layout on EC2 (pm2, Nginx, HTTPS) and the client on Vercel                    | planned  | E6-04 |
+| 0007 | Supabase connection strategy (session pooler, verified TLS, two roles)                   | accepted | E6-04 |
+| 0008 | Deployment layout on EC2 (pm2, Nginx, HTTPS) and the client on Vercel                    | accepted | E6-04 |
 | 0009 | A stateless signed JWT (no session table)                                                | accepted | E1-02 |
 | 0010 | Bearer token instead of a cookie: no CSRF check, and the XSS trade-off                   | accepted | E1-06 |
 | 0011 | Tenant data access helper, enforced by static tests and the cross-tenant harness         | accepted | E2-04 |
