@@ -143,6 +143,14 @@ Owner only (`organization.manage`; other roles get `403` before the body is read
 
 An invitation is a copied link (no email is sent). The token is 32 random bytes in base64url, stored only as a SHA-256 hash, valid for 7 days and single-use. Every response under `/api/invitations` carries `Cache-Control: no-store`. Invitation `status` is derived: `PENDING` (usable), `EXPIRED` (past its time) or `ACCEPTED` (never listed).
 
+### `GET /api/members`
+
+Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100, default 20); other keys are `400`. Lists every user of the organization, active and inactive, the Owner first and then by name. A platform admin never appears.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "items": [{ "id", "name", "email", "role", "isActive", "lastLoginAt", "allWarehouses", "warehouses": [{ "id", "code" }] }], "total", "page", "pageSize" }`. `warehouses` holds the assigned active warehouses (ordered by code); an Owner has `allWarehouses: true` and an empty list. No password hash and no reset columns |
+
 ### `POST /api/invitations`
 
 Owner only (`member.manage`; other roles get `403` before the body is read). Body (strict): `email` (valid, trimmed, stored lowercase), `role` (`WAREHOUSE_ADMIN` or `VIEWER`; `OWNER` is `400`) and `warehouseIds` (UUIDs, no duplicates, at most 200, may be empty or left out).
