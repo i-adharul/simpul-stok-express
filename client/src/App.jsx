@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import BaseLayout from './layouts/BaseLayout'
 import ProtectedRoute from './components/ProtectedRoute'
+import RoleRoute from './components/RoleRoute'
 import SessionExpiredModal from './components/SessionExpiredModal'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
@@ -34,7 +35,9 @@ function App() {
             <Route element={<BaseLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="profile" element={<Profile />} />
-              <Route path="settings" element={<OrganizationSettings />} />
+              <Route element={<RoleRoute roles={['OWNER']} />}>
+                <Route path="settings" element={<OrganizationSettings />} />
+              </Route>
               <Route path="stock" element={<StockSummary />} />
               <Route path="movements" element={<Movements />} />
               <Route path="warehouses" element={<Warehouses />} />
