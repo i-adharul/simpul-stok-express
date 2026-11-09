@@ -62,6 +62,18 @@ Public. Body: `{ "email": string (1-254), "password": string (1-128) }`. Only th
 | 400 | `VALIDATION_ERROR` (missing field, wrong shape, or body is not JSON) |
 | 401 | `{ "code": "INVALID_CREDENTIALS", "message": "Email atau password salah.", "details": null }` (unknown email, wrong password, inactive user, or password over 72 bytes: one identical answer) |
 
+### `POST /api/auth/register-organization`
+
+Public, and not subject to the subscription check (no organization exists yet). Body, all fields required and unknown keys rejected: `{ "organizationName": string (1-100), "slug": string (3-30 lowercase letters and digits), "name": string (1-100), "email": string (valid email, trimmed, stored lowercase), "password": string }`. The password rules of BL01 apply, and the password may not equal the email or the part before the `@`.
+
+One transaction creates the Organization (status `TRIAL`), the Owner and a Subscription to the Starter plan (`currentPeriodStart` now, `currentPeriodEnd` now + 30 days, `graceUntil` period end + 3 days, `billingDay` empty). A failure leaves no row behind.
+
+| Status | Body |
+| ------ | ---- |
+| 201 | `{ "token", "user": { "id", "name", "email", "role": "OWNER" }, "organization": { "id", "name", "slug", "status": "TRIAL" }, "redirectTo": "/dashboard" }`; the token is the same kind as at login (8 hours) |
+| 400 | `VALIDATION_ERROR` (invalid field, unknown key, or a refused password with its reason in `message`) |
+| 409 | `CONFLICT` with `details: [{ "source": "body", "path": "email" \| "slug", "message" }]`: the email or slug is taken. The unique constraint decides, so two simultaneous sign-ups cannot both succeed |
+
 ### `POST /api/auth/logout`
 
 Any caller, with or without a token; no body. Always `204` with no body. The server keeps no session, so nothing is revoked on the server: the client deletes its token. A token stays valid until it expires or until the password changes.

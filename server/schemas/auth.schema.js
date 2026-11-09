@@ -1,4 +1,6 @@
 const { z } = require("zod");
+const { validatePassword } = require("../helpers/password");
+const { organizationNameSchema, slugSchema } = require("./organization.schema");
 
 // Only the shape is checked at login (docs/04): the real test is the password hash. The email
 // is trimmed and lowercased here, once, so the service can look it up as it is. The password is
@@ -15,4 +17,22 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(1).max(128),
 });
 
-module.exports = { loginSchema, changePasswordSchema };
+// BL04. The owner's email is trimmed and lowercase, like at login. The password rules apply here,
+// with the email in hand, so "not equal to the email or the part before the @" is checked too.
+// The password itself is never trimmed. Unknown keys are rejected by validate().
+const registerOrganizationSchema = z
+  .object({
+    organizationName: organizationNameSchema,
+    slug: slugSchema,
+    name: z.string().trim().min(1).max(100),
+    email: z.string().trim().toLowerCase().min(1).max(254).pipe(z.email()),
+    password: z.string().max(128),
+  })
+  .superRefine((body, ctx) => {
+    // Only when the password and the email are usable, so a missing field is reported once.
+    if (typeof body.password !== "string" || typeof body.email !== "string") return;
+    const check = validatePassword(body.password, { email: body.email });
+    if (!check.valid) ctx.addIssue({ code: "custom", path: ["password"], message: check.message });
+  });
+
+module.exports = { loginSchema, changePasswordSchema, registerOrganizationSchema };
