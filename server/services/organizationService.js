@@ -91,4 +91,11 @@ async function getOrganization(ctx) {
   return publicOrganization(organization);
 }
 
-module.exports = { register, getOrganization, TRIAL_DAYS, GRACE_DAYS };
+// Only name and address can change (validated). The row is chosen by ctx.organizationId, so a body
+// that carries another organization's ID cannot reach it (it is rejected as an unknown key anyway).
+async function updateOrganization(ctx, values) {
+  await organizationAccess.updateOrganization(ctx.organizationId, values);
+  return getOrganization(ctx);
+}
+
+module.exports = { register, getOrganization, updateOrganization, TRIAL_DAYS, GRACE_DAYS };

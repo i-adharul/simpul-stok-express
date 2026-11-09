@@ -130,6 +130,15 @@ Every tenant role (`organization.read`); a platform admin gets `403`. There is n
 | ------ | ---- |
 | 200 | `{ "organization": { "id", "name", "slug", "address" (string or null), "status", "createdAt" } }` |
 
+### `PATCH /api/organization`
+
+Owner only (`organization.manage`; other roles get `403` before the body is read). Body (strict, at least one field): `name` (1 to 100) and `address` (up to 255; empty is stored `null`), the same rules as a warehouse. The slug, the time zone and the format are read-only: a body with `slug`, `status`, `id` or `organizationId` is `400`. The organization is always the caller's own.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "organization": { ... } }` as in `GET /api/organization` |
+| 400 | `VALIDATION_ERROR` |
+
 ## Warehouses (S05, BL08)
 
 ### `GET /api/warehouses`

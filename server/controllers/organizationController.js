@@ -12,4 +12,9 @@ async function show(req, res) {
   res.status(200).json({ organization });
 }
 
-module.exports = { registerOrganization, show };
+async function update(req, res) {
+  const organization = await organizationService.updateOrganization(req.ctx, req.valid.body);
+  res.status(200).json({ organization });
+}
+
+module.exports = { registerOrganization, show, update };
