@@ -2,7 +2,7 @@
 
 One file per decision. A decision that is replaced stays in the list with its status changed.
 
-The numbers below are reserved from the start so that other documents can refer to them. A record is written in the story named in the last column, and its status changes from `planned` to `accepted` when it is merged.
+The numbers below are reserved from the start so that other documents can refer to them. A record is written in the story named in the last column, and it starts with status `proposed`, which changes to `accepted` once the maintainer agrees (`superseded` when a later record replaces it). The table shows the current status.
 
 | No   | Title                                                                                    | Status   | Story |
 | ---- | ---------------------------------------------------------------------------------------- | -------- | ----- |

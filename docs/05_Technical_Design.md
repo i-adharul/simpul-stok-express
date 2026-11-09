@@ -34,7 +34,7 @@ Selection principles: (1) one person can explain all of it, (2) it is widely use
 | API documentation | `api_doc.md` and one `.http` file per resource | Easy to run from VS Code and to demonstrate | OpenAPI: postponed |
 | Code quality | Prettier optional; **no CI** in this version | Tests run locally with `npm test`; the README says how | GitHub Actions CI: can be added later |
 | Environment | No Docker; Postgres installed directly and managed with DBeaver | Fewer things to learn | Docker Compose: optional |
-| Deploy | API on EC2 (Node, `pm2`, Nginx, HTTPS with Let's Encrypt); client on Vercel; database on Supabase. **Done at the end of M1** | Shows an understanding of basic infrastructure | A managed platform for the API: faster but hides what the project wants to show |
+| Deploy | **Live since the end of M1.** API on one EC2 instance (Node under `pm2`, Nginx as the TLS terminator, HTTPS with Let's Encrypt) at `simpulstok-api.adharul.my.id`; client on Vercel at `simpulstok.adharul.my.id`; database on Supabase through the session pooler with verified TLS (ADR 0007, ADR 0008) | Shows an understanding of basic infrastructure | A managed platform for the API: faster but hides what the project wants to show |
 
 Redis is not used (idempotency is guaranteed by a unique key in the database). Email is not used (invitation and reset links are copied by hand).
 
@@ -49,7 +49,7 @@ simpul-stok-express/
 ├── server/
 │   ├── bin/www.js
 │   ├── app.js
-│   ├── config/            config.js (sequelize-cli, reads env), env.js (Zod-validated env)
+│   ├── config/            config.js (sequelize-cli, reads env), env.js (validated `env` object, parses process.env once), envSchema.js (Zod schema and pure parseEnv)
 │   ├── migrations/  models/  seeders/
 │   ├── routes/            index.js + one file per resource
 │   ├── controllers/       thin: read the request, call a service or tenant data access, reply
@@ -118,7 +118,7 @@ Verify the token before reading the body. Store a `WebhookEvent` with a unique k
 
 - `bcryptjs` with cost 12 (so a password is at most 72 characters). The JWT is valid for 8 hours with no extension.
 - All input is validated with Zod on the server. A write route must declare a schema (kept by a static test).
-- Secrets (`JWT_SECRET`, the database URL, the cron secret, the Xendit keys) live only in environment variables. `config/env.js` validates them and refuses to start if one is missing.
+- Secrets (`JWT_SECRET`, the database URL, the cron secret, the Xendit keys) live only in environment variables. `config/env.js` parses them with the Zod schema in `config/envSchema.js` and refuses to start if one is missing or invalid.
 - **Security headers and CORS:** `helmet`, and CORS with a list of allowed origins from `CORS_ORIGIN` (no wildcard).
 - **No CSRF protection**, because the browser does not send the token by itself (a bearer header). This follows from choosing bearer and must be explained honestly.
 - **XSS trade-off:** a token in `localStorage` can be stolen if there is an XSS flaw. Mitigations: an 8-hour lifetime, user text rendered through plain React (no `dangerouslySetInnerHTML`), input validation, `helmet`, and the user being read from the database on every request. A later improvement is an `httpOnly` cookie on a shared domain or through a proxy, plus an Origin check.
@@ -130,15 +130,15 @@ Verify the token before reading the body. Store a `WebhookEvent` with a unique k
 
 | Item | Why it matters | Decision |
 | --- | --- | --- |
-| Database configuration | `config.json` cannot read environment variables and could be committed by accident | `config/config.js` reads the environment; `.sequelizerc` points the CLI at it; SSL is on for Supabase |
+| Database configuration | `config.json` cannot read environment variables and could be committed by accident | `config/config.js` reads the environment; `.sequelizerc` points the CLI at it; the connection verifies the server certificate (`rejectUnauthorized: true`) against the CA file named by `DATABASE_CA_PATH`, which is required when `NODE_ENV=production` (ADR 0007) |
 | Test database guard | Tests empty the tables | The Jest setup stops if the test database name does not end in `_test` |
-| Seed guard | A seed with default passwords is dangerous in production | The base seed refuses to run against a non-local database unless `SEED_ALLOW_REMOTE=true` |
+| Seed guard | A seed with default passwords is dangerous in production | The seed refuses a non-local database unless `SEED_ALLOW_REMOTE=true`, and on a remote database it also needs a strong `SEED_PASSWORD` and refuses the public demo password (`helpers/seedGuard.js`, ADR 0007) |
 | Time zone | Consistent data | Stored in UTC, shown in WIB in the client |
 | Error format | The client needs one pattern | `{ code, message, details }`, no stack trace (BL29) |
 | IDs | Easy in URLs, not guessable in sequence | UUID v4 |
 | API documentation | A REST API must be demonstrable | `api_doc.md` and one `.http` file per resource |
 | Backup and retention | Customer data | Supabase backups; business data is archived, not permanently deleted (except `IdempotencyKey`); the audit log and history are kept indefinitely |
-| Deploy | Keeps M1 focused | Postponed to the end of M1 (E6-04): EC2 with `pm2`, Nginx and HTTPS; the client on Vercel with `VITE_API_URL`; CORS allows only the client domain |
+| Deploy | Basic infrastructure that can be explained | Done in E6-04: EC2 with `pm2`, Nginx and HTTPS (`server/scripts/deploy.sh`); the client on Vercel with `VITE_API_URL` and `client/vercel.json`; CORS allows only the client domain; migrations run from a laptop, not in the deploy (ADR 0008) |
 
 ## Measured: the stock history query (BL16)
 
@@ -169,4 +169,4 @@ condition. Timings are from a single warm run on a developer machine and show th
 - [x] Zod for validation
 - [x] Jest + Supertest, a real Postgres, no Docker and no CI in this version
 - [x] A minimal client without Redux
-- [x] Deploy postponed to the end of M1
+- [x] Deploy at the end of M1 (done: EC2 + Nginx + Vercel + Supabase)
