@@ -29,7 +29,7 @@
 //
 const { ACTIONS } = require("../../helpers/permissions");
 const { getSequelize } = require("./db");
-const { createStockLevel } = require("./factories");
+const { createStockLevel, createUser } = require("./factories");
 
 // The row as it is in the database (raw SQL, so the check does not depend on the code it checks).
 const rawRow = (table) => async (id) =>
@@ -95,6 +95,14 @@ const transfer = {
     return { id };
   },
   readRow: rawRow("StockTransfers"),
+};
+
+// A Viewer written by raw SQL (a member of the organization, with a random email).
+const member = {
+  createRow: async (world, organization) => ({
+    id: await createUser(world.organizations[organization], `member-${Math.random().toString(36).slice(2, 12)}@example.com`, "VIEWER"),
+  }),
+  readRow: rawRow("Users"),
 };
 
 // A pending invitation written by raw SQL (random hash and email, created by the organization's Owner).
@@ -328,6 +336,9 @@ const TENANT_ENDPOINTS = [
   // warehouse must appear and B's never (checkList).
   { method: "get", path: "/api/stock/transfers/destinations", kind: "list", action: "transfer.destinations", ...warehouse },
   { method: "get", path: "/api/stock/transfers/:id", kind: "item", action: "history.read", ...transfer },
+  // Members (E7-05): A's list must show A's users and never B's. Platform admins have no organization
+  // and so can never be listed.
+  { method: "get", path: "/api/members", kind: "list", action: "member.manage", listQuery: { pageSize: 100 }, ...member },
   // Invitations (E7-04). The harness cannot see the token, only the rows: A's list must never show
   // B's invitation, B's invitation cannot be cancelled by A, and a warehouse of B in the body is
   // answered exactly like a random UUID (404).

@@ -1,0 +1,9 @@
+### List the members of the organization (Owner only). First log in with http/auth.http and paste the token.
+# Expect 200 {"items":[{"id","name","email","role","isActive","lastLoginAt","allWarehouses","warehouses":[{"id","code"}]}],"total","page","pageSize"}.
+# The Owner comes first (allWarehouses true), then the others by name. No passwordHash and no reset columns.
+GET http://localhost:3000/api/members?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Warehouse Admin or Viewer: 403 FORBIDDEN
+GET http://localhost:3000/api/members
+Authorization: Bearer {{token}}
