@@ -1,5 +1,7 @@
 const { Op } = require("sequelize");
 const { conflict, notFound } = require("../helpers/errors");
+const { findOwned } = require("../helpers/ownership");
+const { pageBody, pageWindow } = require("../helpers/pagination");
 const { generateToken, hashToken } = require("../helpers/token");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
@@ -94,4 +96,30 @@ function create(ctx, { email, role, warehouseIds }) {
   });
 }
 
-module.exports = { create, statusOf, toInvitation, VALID_DAYS };
+// Pending and Expired invitations of the own organization, newest first. Accepted ones are history
+// and are not listed. `tenant(ctx)` adds the organization filter, so another organization's rows
+// can never appear.
+async function list(ctx, query) {
+  const where = { acceptedAt: null };
+  const invitations = tenant(ctx).Invitation;
+  const [total, rows] = await Promise.all([
+    invitations.count({ where }),
+    invitations.findAll({ where, order: [["createdAt", "DESC"], ["id", "DESC"]], ...pageWindow(query) }),
+  ]);
+  const now = new Date();
+  return pageBody(rows.map((row) => toInvitation(row, now)), total, query);
+}
+
+// Cancels a Pending or Expired invitation by deleting its row (the link then stops working). A
+// missing, foreign, malformed or already accepted one is the same 404 (rule 2). The row is read
+// again under a lock, so a cancel and an acceptance at the same moment cannot both win: the
+// acceptance locks the same row (E7-06).
+function cancel(ctx, id) {
+  return inTransaction(async (transaction) => {
+    const invitation = await findOwned(ctx, "Invitation", id, { transaction, lock: transaction.LOCK.UPDATE });
+    if (invitation.acceptedAt) throw notFound();
+    await invitation.destroy({ transaction });
+  });
+}
+
+module.exports = { create, list, cancel, statusOf, toInvitation, VALID_DAYS };

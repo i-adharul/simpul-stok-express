@@ -154,6 +154,23 @@ Owner only (`member.manage`; other roles get `403` before the body is read). Bod
 | 404 | `NOT_FOUND`: a warehouse that is missing, archived or of another organization (one identical answer) |
 | 409 | `CONFLICT` with `details: [{ "source": "body", "path": "email", "message" }]`: the email belongs to an active user, or to a user of another organization, or already has a pending invitation in this organization. The email of an inactive member of the same organization may be invited again. A pending invitation of another organization is not read here; that clash is refused when the invitation is accepted |
 
+### `GET /api/invitations`
+
+Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100, default 20); other keys are `400`. Lists the `PENDING` and `EXPIRED` invitations of the organization, newest first. Accepted invitations are not listed.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "items": [{ "id", "email", "role", "warehouseIds", "expiresAt", "status" }], "total", "page", "pageSize" }`; no token and no `tokenHash` |
+
+### `DELETE /api/invitations/:id`
+
+Owner only (`member.manage`). Cancels a `PENDING` or `EXPIRED` invitation by deleting its row, so its link stops working.
+
+| Status | Body |
+| ------ | ---- |
+| 204 | no body |
+| 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization, or the invitation was already accepted (one identical answer) |
+
 ## Warehouses (S05, BL08)
 
 ### `GET /api/warehouses`

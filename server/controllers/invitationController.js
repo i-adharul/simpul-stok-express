@@ -7,4 +7,13 @@ async function create(req, res) {
   res.status(201).json({ invitation, token });
 }
 
-module.exports = { create };
+async function list(req, res) {
+  res.status(200).json(await invitationService.list(req.ctx, req.valid.query));
+}
+
+async function cancel(req, res) {
+  await invitationService.cancel(req.ctx, req.params.id);
+  res.status(204).end();
+}
+
+module.exports = { create, list, cancel };

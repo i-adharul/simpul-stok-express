@@ -5,7 +5,11 @@ const { requireCan } = require("../middlewares/authorization");
 const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { createInvitationSchema } = require("../schemas/invitation.schema");
+const {
+  createInvitationSchema,
+  invitationIdParamsSchema,
+  invitationListQuerySchema,
+} = require("../schemas/invitation.schema");
 
 const router = express.Router();
 
@@ -14,6 +18,14 @@ router.use("/invitations", noStore);
 
 // Owner only (member.manage). Order as everywhere: who are you, may your role do this (403 before the
 // body is read, rule 2), subscription check (rule 17), then validate.
+router.get(
+  "/invitations",
+  authentication,
+  requireCan("member.manage"),
+  validate({ query: invitationListQuerySchema }),
+  invitationController.list,
+);
+
 router.post(
   "/invitations",
   authentication,
@@ -21,6 +33,16 @@ router.post(
   subscriptionGuard,
   validate({ body: createInvitationSchema }),
   invitationController.create,
+);
+
+// The ID is only checked to be present: a malformed one is a 404 from findOwned, not a 400 (rule 2).
+router.delete(
+  "/invitations/:id",
+  authentication,
+  requireCan("member.manage"),
+  subscriptionGuard,
+  validate({ params: invitationIdParamsSchema }),
+  invitationController.cancel,
 );
 
 module.exports = router;
