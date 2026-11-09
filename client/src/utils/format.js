@@ -82,3 +82,16 @@ export function greetingFor(value) {
   if (hour < 18) return 'Selamat sore'
   return 'Selamat malam'
 }
+
+// "2 hari lagi", "5 jam lagi", "Kurang dari 1 jam lagi"; "Kedaluwarsa" once the time has passed.
+// The total validity period is deliberately not shown (docs/02, Invitation).
+export function timeRemaining(value, now = new Date()) {
+  const date = toDate(value)
+  if (!date) return ''
+  const ms = date.getTime() - now.getTime()
+  if (ms <= 0) return 'Kedaluwarsa'
+  const hours = Math.floor(ms / 3_600_000)
+  if (hours >= 24) return `${Math.floor(hours / 24)} hari lagi`
+  if (hours >= 1) return `${hours} jam lagi`
+  return 'Kurang dari 1 jam lagi'
+}
