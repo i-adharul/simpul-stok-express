@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import http from './http'
+import { fetchAll } from './useStockOptions'
 
 // Active warehouses of the organization (the Owner sees all of them): { items, total } or null while
-// loading. One page of 100 (the API maximum); the Starter plan allows far fewer. Used by S14 for
+// loading. All pages (the API maximum is 100 per page). Used by S14 for
 // "Semua gudang (N)" and by P07 for the checkboxes.
 export function useActiveWarehouses() {
   const [data, setData] = useState(null)
@@ -10,10 +10,9 @@ export function useActiveWarehouses() {
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
-    http
-      .get('/api/warehouses', { params: { pageSize: 100 }, signal: controller.signal })
-      .then(({ data: body }) => {
-        setData({ items: body.items, total: body.total })
+    fetchAll('/api/warehouses', {}, controller.signal)
+      .then((items) => {
+        setData({ items, total: items.length })
         setError(false)
       })
       .catch(() => {

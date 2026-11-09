@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { GENERIC_ERROR, errorText } from '../utils/apiError'
+import PlanLimitNotice from './PlanLimitNotice'
+import { GENERIC_ERROR, errorText, isPlanLimit } from '../utils/apiError'
 
 const COPY = {
   gudang: {
@@ -26,7 +27,7 @@ export default function ArchiveConfirmModal({ kind, name, restore = false, onCon
     try {
       await onConfirm()
     } catch (err) {
-      setBlocked(errorText(err) ?? GENERIC_ERROR)
+      setBlocked({ text: errorText(err) ?? GENERIC_ERROR, planLimit: isPlanLimit(err) })
       setSubmitting(false)
     }
   }
@@ -40,9 +41,13 @@ export default function ArchiveConfirmModal({ kind, name, restore = false, onCon
             <h2 id="archive-title" className="text-lg font-semibold">
               Tidak dapat {restore ? 'dipulihkan' : 'diarsipkan'}
             </h2>
-            <p role="alert" className="text-sm text-base-content/70">
-              {blocked}
-            </p>
+            {blocked.planLimit ? (
+              <PlanLimitNotice message={blocked.text} />
+            ) : (
+              <p role="alert" className="text-sm text-base-content/70">
+                {blocked.text}
+              </p>
+            )}
             <div className="modal-action">
               <button type="button" className="btn btn-primary" onClick={onClose}>
                 Mengerti

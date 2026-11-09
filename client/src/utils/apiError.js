@@ -16,3 +16,8 @@ export function fieldErrorsFrom(error) {
   for (const d of details) if (d.path && !result[d.path]) result[d.path] = d.message
   return result
 }
+
+// 403 PLAN_LIMIT_REACHED (BL20) has its own presentation; a plain 403 FORBIDDEN is something else.
+export function isPlanLimit(error) {
+  return error.response?.status === 403 && error.response.data?.code === 'PLAN_LIMIT_REACHED'
+}

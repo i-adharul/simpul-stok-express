@@ -7,6 +7,7 @@ import StockReceiveModal from '../components/StockReceiveModal'
 import { useAuth } from '../context/authContext'
 import http from '../utils/http'
 import { toast } from '../utils/toast'
+import { fetchAll } from '../utils/useStockOptions'
 import { formatNumber } from '../utils/format'
 import { STATUS_LABELS, cutGroups, groupByProduct } from '../utils/stockMatrix'
 
@@ -115,9 +116,8 @@ export default function StockSummary() {
   }, [search])
 
   useEffect(() => {
-    http
-      .get('/api/warehouses', { params: { pageSize: 100 } })
-      .then((res) => setWarehouses(res.data.items))
+    fetchAll('/api/warehouses', {})
+      .then(setWarehouses)
       .catch((err) => setError(errorText(err) ?? 'Terjadi kesalahan. Silakan coba lagi.'))
   }, [attempt])
 

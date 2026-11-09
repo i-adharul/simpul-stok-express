@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import FormField from './FormField'
-import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
+import PlanLimitNotice from './PlanLimitNotice'
+import { GENERIC_ERROR, errorText, fieldErrorsFrom, isPlanLimit } from '../utils/apiError'
 
 // Same limits as the API (docs/04: code 1 to 20, name 1 to 100, address at most 255). The server
 // validates again; this only saves a round trip and points at the field.
@@ -17,6 +18,7 @@ function validateWarehouse({ code, name, address }) {
 // A 409 CONFLICT ("Kode gudang sudah dipakai.") belongs under the code field; a 400 maps by field path.
 function serverErrors(error) {
   const status = error.response?.status
+  if (isPlanLimit(error)) return { planLimit: error.response.data.message }
   if (status === 409) return { code: error.response.data.message }
   if (status === 400) {
     const byField = fieldErrorsFrom(error)
@@ -67,6 +69,7 @@ export default function WarehouseFormModal({ warehouse, onSubmit, onClose }) {
         <FormField id="warehouse-code" label="Kode gudang" required maxLength={20} hint="Kode unik di organisasi (contoh: GD-04)." value={values.code} onChange={set('code')} error={errors.code} />
         <FormField id="warehouse-name" label="Nama gudang" required maxLength={100} value={values.name} onChange={set('name')} error={errors.name} />
         <FormField id="warehouse-address" label="Alamat" multiline rows={3} maxLength={255} value={values.address} onChange={set('address')} error={errors.address} />
+        {errors.planLimit && <PlanLimitNotice message={errors.planLimit} />}
         {errors.general && (
           <p role="alert" className="text-sm font-medium text-error">
             {errors.general}
