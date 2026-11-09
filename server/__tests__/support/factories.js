@@ -54,6 +54,15 @@ const createSubscription = (organizationId, planId) =>
     { organizationId, planId },
   );
 
+// Puts organizations on a plan with room to spare, so tests of other features can create as many
+// warehouses, products and members as they need (plan limits, BL20, are tested with their own plans).
+// Call it once per test (clearTables empties Plans and Subscriptions).
+async function giveRoomyPlan(...organizationIds) {
+  const roomy = await createPlan("Roomy", { maxWarehouses: 1000, maxProducts: 100000, maxMembers: 1000 });
+  for (const organizationId of organizationIds) await createSubscription(organizationId, roomy);
+  return roomy;
+}
+
 const createProduct = (organizationId, sku = "SKU-1", unit = "pcs") =>
   insertReturningId(
     `INSERT INTO "Products" ("organizationId", "sku", "name", "unit")
@@ -83,11 +92,7 @@ async function createWorld() {
     A: await createOrganization("tokoa"),
     B: await createOrganization("tokob"),
   };
-  // Both organizations are on a plan with room to spare, so tests of other features can create as many
-  // warehouses, products and members as they need (plan limits, BL20, are tested with their own plans).
-  const roomy = await createPlan("Roomy", { maxWarehouses: 1000, maxProducts: 100000, maxMembers: 1000 });
-  await createSubscription(organizations.A, roomy);
-  await createSubscription(organizations.B, roomy);
+  await giveRoomyPlan(organizations.A, organizations.B);
 
   const withToken = (user) => ({ ...user, token: signToken(user.id), authorization: `Bearer ${signToken(user.id)}` });
 
@@ -131,5 +136,6 @@ module.exports = {
   assignWarehouse,
   createPlan,
   createSubscription,
+  giveRoomyPlan,
   createStockLevel,
 };

@@ -7,6 +7,7 @@ const { generateToken, hashToken } = require("../helpers/token");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
 const { findUserByEmail } = require("../helpers/userAccess");
+const { assertWithinLimit, lockOrganization } = require("./planLimitService");
 
 // BL05. Invitations are copied links, valid for 7 days and used once. The service knows nothing
 // about HTTP: the controller passes the request context and the validated body.
@@ -74,11 +75,18 @@ async function assertWarehouses(ctx, warehouseIds, transaction) {
 // The warehouses are checked first, then the email: a foreign warehouse ID is a 404 whatever the
 // email is. Everything runs in one transaction, so the row is written only when every check passed.
 // Returns the invitation and the raw token; the controller is the only place the token leaves.
+//
+// BL20: the member limit is checked here too (active users are counted, pending invitations are not,
+// and the limit is checked again when the invitation is accepted). The organization row is locked
+// first (lock order: organization, then warehouses), which also makes two simultaneous invitations
+// of one email run one after the other, so only one of them can pass the "no pending invitation" check.
 function create(ctx, { email, role, warehouseIds }) {
   return inTransaction(async (transaction) => {
+    await lockOrganization(ctx.organizationId, transaction);
     await assertWarehouses(ctx, warehouseIds, transaction);
     await assertEmailFree(ctx, email);
     await assertNoPending(ctx, email, transaction);
+    await assertWithinLimit(ctx.organizationId, "MEMBER", { transaction });
 
     const token = generateToken();
     const now = new Date();

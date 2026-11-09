@@ -14,6 +14,7 @@ const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
 const { lockWarehouse } = require("./warehouseLock");
 const invitationService = require("./invitationService");
+const { assertWithinLimit, lockOrganization } = require("./planLimitService");
 const {
   findUserByEmail,
   findUserWithPasswordHash,
@@ -141,11 +142,15 @@ async function joinOrganization(invitation, credentials, transaction) {
   const now = new Date();
   const existing = await findUserByEmail(invitation.email, { transaction, lock: transaction.LOCK.UPDATE });
 
-  let user;
-  if (!existing) user = await createMember(ctx, invitation, credentials, now, transaction);
-  else if (canRejoin(existing, invitation.organizationId)) {
-    user = await reactivate(ctx, existing, invitation, credentials, now, transaction);
-  } else throw conflict(EMAIL_TAKEN);
+  // Who the email belongs to is judged first (409), then the member limit (403): both a new member and
+  // a reactivated one become an ACTIVE user, so both are counted again here, under the organization
+  // lock the caller holds (BL20, BL06).
+  if (existing && !canRejoin(existing, invitation.organizationId)) throw conflict(EMAIL_TAKEN);
+  await assertWithinLimit(invitation.organizationId, "MEMBER", { transaction });
+
+  const user = existing
+    ? await reactivate(ctx, existing, invitation, credentials, now, transaction)
+    : await createMember(ctx, invitation, credentials, now, transaction);
 
   await replaceAssignment(ctx, user.id, invitation.warehouseIds, transaction);
   await invitationAccess.markAccepted(invitation.id, now, transaction);
@@ -154,8 +159,8 @@ async function joinOrganization(invitation, credentials, transaction) {
 
 // BL06. A usable token is checked first (an invalid one is a 404 whatever the password is), then the
 // password rules with the invited email (400). bcrypt runs before the transaction so no connection
-// waits for it. Then ONE transaction locks the invitation row (FOR UPDATE) and judges the invitation
-// again: of two simultaneous acceptances of one token, the second waits for the first to commit, sees
+// waits for it. Then ONE transaction locks the organization (plan limit) and the invitation row
+// (FOR UPDATE) and judges the invitation again: of two simultaneous acceptances of one token, the second waits for the first to commit, sees
 // `acceptedAt` and gets the same 404. The user, the assignment and `acceptedAt` commit together.
 async function acceptInvite({ token, name, password }) {
   const first = await invitationService.findUsable(token);
@@ -163,6 +168,10 @@ async function acceptInvite({ token, name, password }) {
   const passwordHash = await hashPassword(password);
 
   const user = await inTransaction(async (transaction) => {
+    // Lock order: the organization first (the plan limit), then the invitation row, then the user row
+    // and the warehouses. The organization of `first` comes from the invitation found by the token hash,
+    // never from the request; the invitation is judged again under its own lock right after.
+    await lockOrganization(first.organizationId, transaction);
     const invitation = await invitationService.findUsable(token, { transaction, lock: transaction.LOCK.UPDATE });
     return joinOrganization(invitation, { name, passwordHash }, transaction);
   });
