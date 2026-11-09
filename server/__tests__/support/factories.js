@@ -40,11 +40,11 @@ const assignWarehouse = (organizationId, userId, warehouseId) =>
     { organizationId, userId, warehouseId },
   );
 
-const createPlan = (name = "Starter") =>
+const createPlan = (name = "Starter", { maxWarehouses = 2, maxProducts = 100, maxMembers = 3 } = {}) =>
   insertReturningId(
     `INSERT INTO "Plans" ("name", "priceIdr", "maxWarehouses", "maxProducts", "maxMembers")
-     VALUES (:name, 300000, 2, 100, 3)`,
-    { name },
+     VALUES (:name, 300000, :maxWarehouses, :maxProducts, :maxMembers)`,
+    { name, maxWarehouses, maxProducts, maxMembers },
   );
 
 const createSubscription = (organizationId, planId) =>
@@ -83,6 +83,11 @@ async function createWorld() {
     A: await createOrganization("tokoa"),
     B: await createOrganization("tokob"),
   };
+  // Both organizations are on a plan with room to spare, so tests of other features can create as many
+  // warehouses, products and members as they need (plan limits, BL20, are tested with their own plans).
+  const roomy = await createPlan("Roomy", { maxWarehouses: 1000, maxProducts: 100000, maxMembers: 1000 });
+  await createSubscription(organizations.A, roomy);
+  await createSubscription(organizations.B, roomy);
 
   const withToken = (user) => ({ ...user, token: signToken(user.id), authorization: `Bearer ${signToken(user.id)}` });
 
