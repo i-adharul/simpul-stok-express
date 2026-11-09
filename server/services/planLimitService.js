@@ -46,10 +46,28 @@ async function getPlanLimits(organizationId, options = {}) {
 // unpaid downgrade request exists (BL20), and every caller already goes through here.
 const getEffectiveLimits = (organizationId, options = {}) => getPlanLimits(organizationId, options);
 
+// Locks the organization row (SELECT ... FOR UPDATE) inside the caller's transaction, BEFORE counting
+// and writing, so two simultaneous requests at the limit run one after the other: the second one
+// counts after the first has committed and is refused. Without this both would count "one slot left"
+// and both would write (the classic check-then-write race).
+//
+// LOCK ORDER (every writer that takes more than one lock must follow it, so none can deadlock):
+//   1. the organization row (here),
+//   2. then warehouse rows, in ID order (services/warehouseLock.js, ADR 0013).
+// The invitation row and the user row of the accept flow come between the two and are only taken after
+// the organization lock when a plan check is part of the same transaction (E8-02).
+async function lockOrganization(organizationId, transaction) {
+  if (!transaction) throw new Error("lockOrganization must run inside a transaction");
+  const row = await organizationAccess.lockOrganizationRow(organizationId, transaction);
+  // A missing organization means the caller's user outlived it: nothing to count and nothing to lock.
+  if (!row) throw internalError();
+}
+
 const LABEL = Object.freeze({ WAREHOUSE: "gudang", PRODUCT: "produk", MEMBER: "anggota" });
 
-// Refuses ONE more WAREHOUSE, PRODUCT or MEMBER when the organization already uses its whole limit:
-// used >= limit means the addition would exceed it. 403 PLAN_LIMIT_REACHED with
+// Takes the organization lock first (lockOrganization), then refuses ONE more WAREHOUSE, PRODUCT or
+// MEMBER when the organization already uses its whole limit: used >= limit means the addition would
+// exceed it. 403 PLAN_LIMIT_REACHED with
 // `details: { resource, limit, used }` and an Indonesian message. Must run inside the caller's
 // transaction, and the caller writes in that same transaction right after: usage is only meaningful
 // while nobody else can add in between (the organization lock, below). Pending invitations are not
@@ -57,6 +75,8 @@ const LABEL = Object.freeze({ WAREHOUSE: "gudang", PRODUCT: "produk", MEMBER: "a
 async function assertWithinLimit(organizationId, resource, { transaction } = {}) {
   if (!transaction) throw new Error("assertWithinLimit must run inside a transaction");
   if (!RESOURCES.includes(resource)) throw new Error(`Unknown plan resource: ${resource}`);
+
+  await lockOrganization(organizationId, transaction);
 
   const options = { transaction };
   const [usage, limits] = await Promise.all([
@@ -74,4 +94,4 @@ async function assertWithinLimit(organizationId, resource, { transaction } = {})
   }
 }
 
-module.exports = { RESOURCES, getUsage, getPlanLimits, getEffectiveLimits, assertWithinLimit };
+module.exports = { RESOURCES, getUsage, getPlanLimits, getEffectiveLimits, lockOrganization, assertWithinLimit };
