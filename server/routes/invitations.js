@@ -18,6 +18,10 @@ router.use("/invitations", noStore);
 
 // Owner only (member.manage). Order as everywhere: who are you, may your role do this (403 before the
 // body is read, rule 2), subscription check (rule 17), then validate.
+// Public: the person who opens the link has no account yet (BL06). The token is the proof, and the
+// request logger prints the route pattern "/api/invitations/:token", never the token itself.
+router.get("/invitations/:token", invitationController.show);
+
 router.get(
   "/invitations",
   authentication,

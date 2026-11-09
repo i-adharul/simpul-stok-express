@@ -1,12 +1,19 @@
+const { UniqueConstraintError } = require("sequelize");
 const { comparePassword, hashPassword } = require("../helpers/bcrypt");
 const {
+  conflict,
   invalidCredentials,
   invalidCurrentPassword,
   unauthenticated,
   validationError,
 } = require("../helpers/errors");
+const invitationAccess = require("../helpers/invitationAccess");
 const { signToken } = require("../helpers/jwt");
 const { validatePassword } = require("../helpers/password");
+const { inTransaction } = require("../helpers/transaction");
+const { tenant } = require("../helpers/tenantScope");
+const { lockWarehouse } = require("./warehouseLock");
+const invitationService = require("./invitationService");
 const {
   findUserByEmail,
   findUserWithPasswordHash,
@@ -70,4 +77,98 @@ async function changePassword(userId, { currentPassword, newPassword }) {
   return { token: signToken(user.id) };
 }
 
-module.exports = { login, changePassword };
+// The password rules (helpers/password.js) with the INVITED email, which only the invitation knows.
+// Same 400 shape as the change of a password: the reason is the message.
+function assertPasswordAllowed(password, email) {
+  const check = validatePassword(password, { email });
+  if (check.valid) return;
+  throw validationError([{ source: "body", path: "password", message: check.message }], check.message);
+}
+
+const EMAIL_TAKEN = "Email sudah terdaftar.";
+
+// Replaces ALL assignment rows of the user by the invitation's warehouses that are still active.
+// Each warehouse is locked in ID order (the same order as every other writer, ADR 0013) and read
+// again under the lock, so an archive that runs at the same moment cannot leave an assignment on an
+// archived warehouse. Missing or archived ones are skipped: the person joins with what is left.
+async function replaceAssignment(ctx, userId, warehouseIds, transaction) {
+  const old = await tenant(ctx).UserWarehouse.findAll({ where: { userId }, transaction });
+  for (const row of old) await row.destroy({ transaction });
+
+  for (const warehouseId of [...warehouseIds].sort()) {
+    const warehouse = await lockWarehouse(ctx, warehouseId, transaction);
+    if (warehouse && !warehouse.archivedAt) {
+      await tenant(ctx).UserWarehouse.create({ userId, warehouseId }, { transaction });
+    }
+  }
+}
+
+// An email that now belongs to ANY active user, to a user of another organization, or to an Owner or
+// Platform admin is a 409 (docs/04). Only an inactive Warehouse Admin or Viewer of THIS organization
+// is brought back, with the new name, password, role and assignment (BL06); `passwordChangedAt` makes
+// every token that user held earlier stop working (BL01).
+function canRejoin(user, organizationId) {
+  return user.organizationId === organizationId && !user.isActive && ["WAREHOUSE_ADMIN", "VIEWER"].includes(user.role);
+}
+
+async function reactivate(ctx, user, invitation, { name, passwordHash }, now, transaction) {
+  await tenant(ctx).User.update(
+    { name, passwordHash, role: invitation.role, isActive: true, passwordChangedAt: now, lastLoginAt: now },
+    { where: { id: user.id }, transaction },
+  );
+  return { id: user.id, name, email: user.email, role: invitation.role };
+}
+
+// A second organization may be accepting the same email at this very moment: the unique key of the
+// email decides, and the loser gets the same 409.
+async function createMember(ctx, invitation, { name, passwordHash }, now, transaction) {
+  try {
+    const user = await tenant(ctx).User.create(
+      { email: invitation.email, name, passwordHash, role: invitation.role, lastLoginAt: now },
+      { transaction },
+    );
+    return { id: user.id, name: user.name, email: user.email, role: user.role };
+  } catch (err) {
+    if (err instanceof UniqueConstraintError) throw conflict(EMAIL_TAKEN);
+    throw err;
+  }
+}
+
+async function joinOrganization(invitation, credentials, transaction) {
+  // The organization comes from the invitation row, which was found by the hash of the token and
+  // locked: nothing from the request can choose it (rule 1).
+  const ctx = { organizationId: invitation.organizationId };
+  const now = new Date();
+  const existing = await findUserByEmail(invitation.email, { transaction, lock: transaction.LOCK.UPDATE });
+
+  let user;
+  if (!existing) user = await createMember(ctx, invitation, credentials, now, transaction);
+  else if (canRejoin(existing, invitation.organizationId)) {
+    user = await reactivate(ctx, existing, invitation, credentials, now, transaction);
+  } else throw conflict(EMAIL_TAKEN);
+
+  await replaceAssignment(ctx, user.id, invitation.warehouseIds, transaction);
+  await invitationAccess.markAccepted(invitation.id, now, transaction);
+  return user;
+}
+
+// BL06. A usable token is checked first (an invalid one is a 404 whatever the password is), then the
+// password rules with the invited email (400). bcrypt runs before the transaction so no connection
+// waits for it. Then ONE transaction locks the invitation row (FOR UPDATE) and judges the invitation
+// again: of two simultaneous acceptances of one token, the second waits for the first to commit, sees
+// `acceptedAt` and gets the same 404. The user, the assignment and `acceptedAt` commit together.
+async function acceptInvite({ token, name, password }) {
+  const first = await invitationService.findUsable(token);
+  assertPasswordAllowed(password, first.email);
+  const passwordHash = await hashPassword(password);
+
+  const user = await inTransaction(async (transaction) => {
+    const invitation = await invitationService.findUsable(token, { transaction, lock: transaction.LOCK.UPDATE });
+    return joinOrganization(invitation, { name, passwordHash }, transaction);
+  });
+
+  // Signed after the commit; `iat` is not older than `passwordChangedAt`, so the new token is valid.
+  return { token: signToken(user.id), user, redirectTo: "/dashboard" };
+}
+
+module.exports = { login, changePassword, acceptInvite };

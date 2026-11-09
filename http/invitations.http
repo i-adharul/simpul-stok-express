@@ -32,3 +32,15 @@ Authorization: Bearer {{token}}
 # Expect 204. An accepted, foreign, unknown or malformed ID gives an identical 404.
 DELETE http://localhost:3000/api/invitations/00000000-0000-4000-8000-000000000000
 Authorization: Bearer {{token}}
+
+### Open an invitation link (public, no token header). Use the "token" from the POST /api/invitations response.
+# Expect 200 {"email","role","organizationName","expiresAt"}. A malformed, unknown, expired or used token gives one identical 404.
+GET http://localhost:3000/api/invitations/PASTE_THE_RAW_TOKEN_HERE
+
+### Accept the invitation (public). The new member gets a token and lands on /dashboard.
+# Expect 200 {"token","user":{"id","name","email","role"},"redirectTo":"/dashboard"} and Cache-Control: no-store.
+# A second call with the same token gives 404; a password equal to the invited email gives 400; an email that now belongs to another user gives 409.
+POST http://localhost:3000/api/auth/accept-invite
+Content-Type: application/json
+
+{ "token": "PASTE_THE_RAW_TOKEN_HERE", "name": "Sari Gudang", "password": "Gula-Kopi-2026" }

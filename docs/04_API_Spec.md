@@ -74,6 +74,19 @@ One transaction creates the Organization (status `TRIAL`), the Owner and a Subsc
 | 400 | `VALIDATION_ERROR` (invalid field, unknown key, or a refused password with its reason in `message`) |
 | 409 | `CONFLICT` with `details: [{ "source": "body", "path": "email" \| "slug", "message" }]`: the email or slug is taken. The unique constraint decides, so two simultaneous sign-ups cannot both succeed |
 
+### `POST /api/auth/accept-invite`
+
+Public (the token in the body is the proof) and not subject to the subscription check. Body, all required and unknown keys rejected: `{ "token": string, "name": string (1-100), "password": string }`. The password rules of BL01 apply, and the password may not equal the invited email or the part before the `@`.
+
+In one transaction that locks the invitation row (`SELECT ... FOR UPDATE`) and judges it again, the server creates the user, replaces the warehouse assignment (only warehouses that are still active) and marks the invitation used. The email of an **inactive member of the same organization** reactivates that user with the new name, password, role and assignment; every token that user held earlier stops working. Of two simultaneous acceptances of one token exactly one succeeds.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }` |
+| 400 | `VALIDATION_ERROR` (shape, or the reason the password is refused in `message` with `details: [{ "source": "body", "path": "password", "message" }]`) |
+| 404 | `NOT_FOUND`, identical to `GET /api/invitations/:token`: the token is malformed, unknown, expired or already used |
+| 409 | `CONFLICT`: the email now belongs to an active user, to a user of another organization, or to an Owner |
+
 ### `POST /api/auth/logout`
 
 Any caller, with or without a token; no body. Always `204` with no body. The server keeps no session, so nothing is revoked on the server: the client deletes its token. A token stays valid until it expires or until the password changes.
@@ -169,6 +182,15 @@ Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100
 | Status | Body |
 | ------ | ---- |
 | 200 | `{ "items": [{ "id", "email", "role", "warehouseIds", "expiresAt", "status" }], "total", "page", "pageSize" }`; no token and no `tokenHash` |
+
+### `GET /api/invitations/:token`
+
+Public (no token in the header: the token in the URL is the proof). The raw token is hashed and looked up. A malformed, unknown, expired or already used token is one identical answer, so the response never says which.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "email", "role", "organizationName", "expiresAt" }` |
+| 404 | `{ "code": "NOT_FOUND", "message": "Data tidak ditemukan.", "details": null }` |
 
 ### `DELETE /api/invitations/:id`
 

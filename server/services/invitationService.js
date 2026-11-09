@@ -2,6 +2,7 @@ const { Op } = require("sequelize");
 const { conflict, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
+const invitationAccess = require("../helpers/invitationAccess");
 const { generateToken, hashToken } = require("../helpers/token");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
@@ -122,4 +123,29 @@ function cancel(ctx, id) {
   });
 }
 
-module.exports = { create, list, cancel, statusOf, toInvitation, VALID_DAYS };
+// A token has exactly the shape generateToken() makes. Anything else cannot match a hash, so it is
+// refused before hashing (no work for a garbage URL).
+const TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+
+// The invitation behind a raw token, if it can still be accepted: it exists, is not used and has not
+// expired. Malformed, unknown, expired and used tokens are ONE and the same 404 with the same body,
+// so the answer never says which of them it was (BL06). Not tenant-scoped: no session exists yet.
+async function findUsable(token, options = {}) {
+  if (typeof token !== "string" || !TOKEN_SHAPE.test(token)) throw notFound();
+  const invitation = await invitationAccess.findByTokenHash(hashToken(token), options);
+  if (!invitation || statusOf(invitation) !== "PENDING") throw notFound();
+  return invitation;
+}
+
+// Public: what the person who opens the link needs to see before choosing a password.
+async function showByToken(token) {
+  const invitation = await findUsable(token);
+  return {
+    email: invitation.email,
+    role: invitation.role,
+    organizationName: await invitationAccess.findOrganizationName(invitation.organizationId),
+    expiresAt: invitation.expiresAt,
+  };
+}
+
+module.exports = { create, list, cancel, showByToken, findUsable, statusOf, toInvitation, VALID_DAYS };

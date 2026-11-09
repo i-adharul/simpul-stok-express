@@ -89,3 +89,42 @@ describe("registerOrganizationSchema", () => {
     expect(paths(register(rest).error)).toEqual([key]);
   });
 });
+
+describe("acceptInviteSchema", () => {
+  const { acceptInviteSchema } = require("../schemas/auth.schema");
+  const accept = (body) => run(acceptInviteSchema, body);
+  const valid = { token: "t".repeat(43), name: " Sari ", password: "Gula-Kopi-2026" };
+
+  it("trims the name, keeps the token and the password as they are", () => {
+    const { valid: out } = accept({ ...valid, password: " Gula-Kopi-2026 " });
+
+    expect(out.body).toEqual({ token: "t".repeat(43), name: "Sari", password: " Gula-Kopi-2026 " });
+  });
+
+  it("leaves the password rules to the service (the invited email is not known here)", () => {
+    expect(accept({ ...valid, password: "short" }).error).toBeUndefined();
+  });
+
+  it.each(["token", "name", "password"])("requires %s", (key) => {
+    const { [key]: _omit, ...rest } = valid;
+
+    expect(paths(accept(rest).error)).toEqual([key]);
+  });
+
+  it.each([
+    [{ name: "   " }, "name"],
+    [{ name: "a".repeat(101) }, "name"],
+    [{ token: "" }, "token"],
+    [{ token: "t".repeat(201) }, "token"],
+    [{ password: "a".repeat(129) }, "password"],
+    [{ token: 5 }, "token"],
+  ])("rejects %j at %s", (patch, path) => {
+    expect(paths(accept({ ...valid, ...patch }).error)).toContain(path);
+  });
+
+  it("rejects unknown keys such as email, role or organizationId", () => {
+    expect(paths(accept({ ...valid, email: "a@b.id", role: "OWNER", organizationId: "x" }).error)).toEqual(
+      expect.arrayContaining(["email", "role", "organizationId"]),
+    );
+  });
+});
