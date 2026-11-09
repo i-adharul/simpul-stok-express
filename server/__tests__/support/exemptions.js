@@ -2,8 +2,12 @@
 // exactly one of: TENANT_ENDPOINTS (registry.js), EXEMPT_ROUTES, PUBLIC_ROUTES. Labels are
 // "<METHOD> <path as declared in the router>". Keep these short and keep the reasons honest.
 
-// A tenant route that cannot be tested the normal way. None yet.
-const EXEMPT_ROUTES = {};
+// A tenant route that cannot be tested the normal way (it has no ID the harness can swap for another
+// organization's). Each entry names the test that proves its isolation instead.
+const EXEMPT_ROUTES = {
+  "GET /organization": "No ID in the URL, so the harness has no foreign ID to try: the row is chosen by ctx.organizationId only. Proven by organization.isolation.test.js.",
+  "PATCH /organization": "No ID in the URL and no ID field in the body (organizationId is rejected as an unknown key): the row is chosen by ctx.organizationId only. Proven by organization.isolation.test.js.",
+};
 
 // Not tenant data at all: no ID from outside is looked up in another organization's data, and
 // the code behind them must not use the tenant data access.
