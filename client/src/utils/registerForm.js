@@ -22,12 +22,32 @@ export function validateOrganization({ organizationName, slug }) {
 export const PASSWORD_HINT = 'Minimal 8 karakter, mengandung huruf dan angka.'
 const PASSWORD_ERROR = 'Password harus minimal 8 karakter dan mengandung huruf serta angka.'
 
-export function validateOwner({ name, email, password, passwordConfirm }) {
+function validateName(name) {
+  if (!name.trim()) return 'Nama lengkap wajib diisi.'
+  if (name.trim().length > 100) return 'Nama lengkap maksimal 100 karakter.'
+  return undefined
+}
+
+// Password rule of BL01 and its confirmation. "Terlalu umum" is only known to the server.
+export function validatePasswordPair({ password, passwordConfirm }) {
   const errors = {}
-  if (!name.trim()) errors.name = 'Nama lengkap wajib diisi.'
-  else if (name.trim().length > 100) errors.name = 'Nama lengkap maksimal 100 karakter.'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'Format email tidak valid.'
   if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) errors.password = PASSWORD_ERROR
-  if (!errors.password && passwordConfirm !== password) errors.passwordConfirm = 'Konfirmasi password tidak sama.'
+  else if (passwordConfirm !== password) errors.passwordConfirm = 'Konfirmasi password tidak sama.'
+  return errors
+}
+
+export function validateOwner({ name, email, password, passwordConfirm }) {
+  const errors = validatePasswordPair({ password, passwordConfirm })
+  const nameError = validateName(name)
+  if (nameError) errors.name = nameError
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'Format email tidak valid.'
+  return errors
+}
+
+// S03 (accept invitation): the email comes from the invitation, so only name and password are checked.
+export function validateAccept({ name, password, passwordConfirm }) {
+  const errors = validatePasswordPair({ password, passwordConfirm })
+  const nameError = validateName(name)
+  if (nameError) errors.name = nameError
   return errors
 }
