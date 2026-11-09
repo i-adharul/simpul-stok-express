@@ -16,4 +16,9 @@ async function cancel(req, res) {
   res.status(204).end();
 }
 
-module.exports = { create, list, cancel };
+// Public (no session): the token in the URL is the proof. Every invalid token is the same 404.
+async function show(req, res) {
+  res.status(200).json(await invitationService.showByToken(req.params.token));
+}
+
+module.exports = { create, list, cancel, show };

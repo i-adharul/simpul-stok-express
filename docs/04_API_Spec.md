@@ -170,6 +170,15 @@ Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100
 | ------ | ---- |
 | 200 | `{ "items": [{ "id", "email", "role", "warehouseIds", "expiresAt", "status" }], "total", "page", "pageSize" }`; no token and no `tokenHash` |
 
+### `GET /api/invitations/:token`
+
+Public (no token in the header: the token in the URL is the proof). The raw token is hashed and looked up. A malformed, unknown, expired or already used token is one identical answer, so the response never says which.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "email", "role", "organizationName", "expiresAt" }` |
+| 404 | `{ "code": "NOT_FOUND", "message": "Data tidak ditemukan.", "details": null }` |
+
 ### `DELETE /api/invitations/:id`
 
 Owner only (`member.manage`). Cancels a `PENDING` or `EXPIRED` invitation by deleting its row, so its link stops working.
