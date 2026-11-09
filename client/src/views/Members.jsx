@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { ROLE_LABELS } from '../constants/navigation'
+import ChangeMemberAccessModal from '../components/ChangeMemberAccessModal'
+import DeactivateMemberModal from '../components/DeactivateMemberModal'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
@@ -29,7 +31,31 @@ function ListState({ list, emptyMessage, children }) {
   return children
 }
 
-function MembersTable({ list, activeCount }) {
+// Kebab menu of a row. The Owner row and an inactive member have no actions.
+function RowActions({ member, onEdit, onDeactivate }) {
+  if (member.role === 'OWNER' || !member.isActive) return null
+  const pick = (action) => () => {
+    document.activeElement?.blur()
+    action(member)
+  }
+  return (
+    <div className="dropdown dropdown-end">
+      <button type="button" tabIndex={0} className="btn btn-ghost btn-xs btn-square" aria-label={`Aksi untuk ${member.name}`}>
+        <span className="material-symbols-outlined text-[18px]">more_vert</span>
+      </button>
+      <ul tabIndex={0} className="menu dropdown-content z-10 w-44 rounded-box border border-base-300 bg-base-100 p-1 shadow">
+        <li>
+          <button type="button" onClick={pick(onEdit)}>Ubah akses</button>
+        </li>
+        <li>
+          <button type="button" className="text-error" onClick={pick(onDeactivate)}>Nonaktifkan</button>
+        </li>
+      </ul>
+    </div>
+  )
+}
+
+function MembersTable({ list, activeCount, onEdit, onDeactivate }) {
   const { data, loading, page, setPage } = list
   return (
     <div className={`rounded-xl border border-base-300 bg-base-100 ${loading ? 'opacity-60' : ''}`}>
@@ -42,6 +68,7 @@ function MembersTable({ list, activeCount }) {
               <th>Akses gudang</th>
               <th>Terakhir masuk</th>
               <th>Status</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -58,6 +85,9 @@ function MembersTable({ list, activeCount }) {
                 <td className="text-base-content/70">{m.lastLoginAt ? formatDateTime(m.lastLoginAt) : 'Belum pernah'}</td>
                 <td>
                   <span className={`badge badge-soft ${m.isActive ? 'badge-success' : 'badge-ghost'}`}>{m.isActive ? 'Aktif' : 'Nonaktif'}</span>
+                </td>
+                <td className="text-right">
+                  <RowActions member={m} onEdit={onEdit} onDeactivate={onDeactivate} />
                 </td>
               </tr>
             ))}
@@ -121,6 +151,15 @@ export default function Members() {
   // The 201 answer ({ invitation, token }) while P08 is open; dropped on close so the token is gone.
   const [created, setCreated] = useState(null)
   const [cancellingId, setCancellingId] = useState(null)
+  const [editing, setEditing] = useState(null) // member row for P09
+  const [deactivating, setDeactivating] = useState(null) // member row for P10
+
+  function handleMemberChanged(message) {
+    setEditing(null)
+    setDeactivating(null)
+    toast.success(message)
+    members.reload()
+  }
 
   function handleCreated(answer) {
     setInviting(false)
@@ -159,7 +198,7 @@ export default function Members() {
       <section className="space-y-3">
         <h2 className="font-bold">Anggota{members.data ? ` (${members.data.total})` : ''}</h2>
         <ListState list={members} emptyMessage="Belum ada anggota.">
-          <MembersTable list={members} activeCount={activeCount} />
+          <MembersTable list={members} activeCount={activeCount} onEdit={setEditing} onDeactivate={setDeactivating} />
         </ListState>
       </section>
 
@@ -169,6 +208,8 @@ export default function Members() {
           <InvitationsTable list={invitations} onCancel={cancelInvitation} cancellingId={cancellingId} />
         </ListState>
       </section>
+      {editing && <ChangeMemberAccessModal member={editing} warehouses={warehouses?.items ?? []} onSaved={() => handleMemberChanged('Akses anggota diperbarui.')} onClose={() => setEditing(null)} />}
+      {deactivating && <DeactivateMemberModal member={deactivating} onDone={() => handleMemberChanged('Anggota dinonaktifkan.')} onClose={() => setDeactivating(null)} />}
       {created && <InvitationLinkModal path={`/invite/${created.token}`} email={created.invitation.email} role={created.invitation.role} onClose={() => setCreated(null)} />}
       {inviting && <InviteMemberModal warehouses={warehouses.items} onCreated={handleCreated} onClose={() => setInviting(false)} />}
     </div>
