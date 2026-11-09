@@ -35,4 +35,15 @@ const registerOrganizationSchema = z
     if (!check.valid) ctx.addIssue({ code: "custom", path: ["password"], message: check.message });
   });
 
-module.exports = { loginSchema, changePasswordSchema, registerOrganizationSchema };
+// BL06. Only the shape is checked here: the invited email is not known until the token is looked up,
+// so "the password is not equal to the invited email (or the part before the @)" is applied by the
+// service, together with the other password rules (helpers/password.js), once the invitation is found.
+// A token of the wrong shape is not a 400: every invalid token is the same 404 (docs/04), so its
+// length is only capped. Neither the token nor the password is trimmed.
+const acceptInviteSchema = z.object({
+  token: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(100),
+  password: z.string().min(1).max(128),
+});
+
+module.exports = { loginSchema, changePasswordSchema, registerOrganizationSchema, acceptInviteSchema };
