@@ -13,4 +13,22 @@ const insertUser = (values, transaction) => User.create(values, { transaction })
 
 const insertSubscription = (values, transaction) => Subscription.create(values, { transaction });
 
-module.exports = { findPlanByName, insertOrganization, insertUser, insertSubscription };
+// The organization of the caller. `organizationId` always comes from the request context (built from
+// the user in the database), never from the URL or the body: there is no ID in /api/organization.
+const findOrganization = (organizationId, options = {}) =>
+  Organization.findByPk(organizationId, {
+    attributes: ["id", "name", "slug", "address", "status", "createdAt"],
+    ...options,
+  });
+
+const updateOrganization = (organizationId, values) =>
+  Organization.update(values, { where: { id: organizationId } });
+
+module.exports = {
+  findPlanByName,
+  insertOrganization,
+  insertUser,
+  insertSubscription,
+  findOrganization,
+  updateOrganization,
+};

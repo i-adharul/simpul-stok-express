@@ -25,6 +25,9 @@ const ACTIONS = Object.freeze({
   "member.manage": define("organization", OWNER_ONLY),
   "subscription.manage": define("organization", OWNER_ONLY),
   "transfer.destinations": define("organization", OWNER_AND_ADMIN),
+  // The organization itself (name and address): every tenant role reads it, only the Owner edits it.
+  "organization.read": define("organization", ALL_TENANT),
+  "organization.manage": define("organization", OWNER_ONLY),
   // Warehouse level
   "stock.read": define("warehouse", ALL_TENANT),
   "history.read": define("warehouse", ALL_TENANT),

@@ -13,6 +13,8 @@ const EXPECTED = {
   "member.manage": ["-", "Y", "-", "-"],
   "subscription.manage": ["-", "Y", "-", "-"],
   "transfer.destinations": ["-", "Y", "Y", "-"],
+  "organization.read": ["-", "Y", "Y", "Y"],
+  "organization.manage": ["-", "Y", "-", "-"],
   // warehouse level (the "Y" holds only for a warehouse that is in the caller's list)
   "stock.read": ["-", "Y", "Y", "Y"],
   "history.read": ["-", "Y", "Y", "Y"],
@@ -44,9 +46,9 @@ for (const [action, allowed] of Object.entries(EXPECTED)) {
 }
 
 describe("role x action x warehouse", () => {
-  it("covers 12 actions x 4 roles x 3 warehouse situations", () => {
-    expect(Object.keys(EXPECTED)).toHaveLength(12);
-    expect(cases).toHaveLength(12 * 4 * 3);
+  it("covers 14 actions x 4 roles x 3 warehouse situations", () => {
+    expect(Object.keys(EXPECTED)).toHaveLength(14);
+    expect(cases).toHaveLength(14 * 4 * 3);
   });
 
   it.each(cases)("%s may/may not %s with %s", (role, action, _label, warehouseId, expected) => {

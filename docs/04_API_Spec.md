@@ -120,6 +120,25 @@ Every error body is `{ code, message, details }` (BL29), with no stack trace. `m
 
 Every tenant endpoint below also answers `401 UNAUTHENTICATED`, `403 FORBIDDEN` for a platform admin (a platform admin has no organization), `400 VALIDATION_ERROR` for invalid input and `500 INTERNAL_ERROR`; these are not repeated in each table. A role without the right gets `403` before the query or body is validated.
 
+## Organization (S15)
+
+### `GET /api/organization`
+
+Every tenant role (`organization.read`); a platform admin gets `403`. There is no ID in the URL: the organization is the caller's own, from the request context.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "organization": { "id", "name", "slug", "address" (string or null), "status", "createdAt" } }` |
+
+### `PATCH /api/organization`
+
+Owner only (`organization.manage`; other roles get `403` before the body is read). Body (strict, at least one field): `name` (1 to 100) and `address` (up to 255; empty is stored `null`), the same rules as a warehouse. The slug, the time zone and the format are read-only: a body with `slug`, `status`, `id` or `organizationId` is `400`. The organization is always the caller's own.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "organization": { ... } }` as in `GET /api/organization` |
+| 400 | `VALIDATION_ERROR` |
+
 ## Warehouses (S05, BL08)
 
 ### `GET /api/warehouses`

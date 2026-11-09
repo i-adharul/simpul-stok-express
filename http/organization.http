@@ -1,0 +1,27 @@
+### Read the organization (any tenant role). First log in with http/auth.http and paste the token.
+# Expect 200 {"organization":{"id","name","slug","address","status","createdAt"}}. A platform admin gets 403.
+GET http://localhost:3000/api/organization
+Authorization: Bearer {{token}}
+
+### Change name and address (Owner only)
+# Expect 200 with the updated organization. The new name also shows in GET /api/me. An empty address becomes null.
+PATCH http://localhost:3000/api/organization
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Toko Sentosa", "address": "Jl. Merdeka 1, Jakarta" }
+
+### The slug is read-only
+# Expect 400 VALIDATION_ERROR with details [{ "source": "body", "path": "slug", "message": "Field tidak dikenal." }]
+PATCH http://localhost:3000/api/organization
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "slug": "baru" }
+
+### Warehouse Admin or Viewer: 403 FORBIDDEN, even for an invalid body
+PATCH http://localhost:3000/api/organization
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Dicoba" }
