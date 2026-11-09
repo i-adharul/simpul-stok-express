@@ -8,6 +8,8 @@ const { hashToken } = require("../helpers/token");
 const { getSequelize } = require("./support/db");
 const { clearTables } = require("./support/clearTables");
 const { createAccount } = require("./support/accounts");
+const { logger } = require("../helpers/logger");
+const { runConcurrently } = require("./support/concurrency");
 const { createOrganization } = require("./support/factories");
 
 jest.setTimeout(60000);
@@ -227,5 +229,72 @@ describe("POST /api/auth/reset-password", () => {
 
     expect((await request(app).post("/api/auth/reset-password").send({ token, password: NEW_PASSWORD, email: "x@y.id" })).status).toBe(400);
     expect((await request(app).post("/api/auth/reset-password").send({ token })).status).toBe(400);
+  });
+});
+
+describe("POST /api/auth/reset-password: concurrency", () => {
+  it("two simultaneous uses of one link: exactly one 204, the other the identical 404", async () => {
+    const token = await linkFor();
+
+    const results = await runConcurrently(2, (index) => reset(token, index === 0 ? "Kopi-Gula-2027" : "Teh-Manis-2028"));
+
+    expect(results.map((res) => res.status).sort()).toEqual([204, 404]);
+    expect(results.find((res) => res.status === 404).body).toEqual(NOT_FOUND);
+    const winner = results[0].status === 204 ? "Kopi-Gula-2027" : "Teh-Manis-2028";
+    const loser = winner === "Kopi-Gula-2027" ? "Teh-Manis-2028" : "Kopi-Gula-2027";
+    expect((await login("viewer-a@example.com", winner)).status).toBe(200);
+    expect((await login("viewer-a@example.com", loser)).status).toBe(401);
+  });
+
+  it("many simultaneous uses: still exactly one 204", async () => {
+    const token = await linkFor();
+
+    const results = await runConcurrently(6, (index) => reset(token, `Kopi-Gula-${2020 + index}`));
+
+    expect(results.filter((res) => res.status === 204)).toHaveLength(1);
+    expect(results.filter((res) => res.status === 404)).toHaveLength(5);
+  });
+});
+
+describe("the reset secrets never leak", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("no response of the members endpoints holds the hash or the expiry column", async () => {
+    const created = await createLink(users.VIEWER.id);
+    const hash = hashToken(created.body.token);
+    const responses = [
+      await request(app).get("/api/members").set("Authorization", auth()),
+      await request(app).patch(`/api/members/${users.VIEWER.id}`).set("Authorization", auth()).send({ role: "WAREHOUSE_ADMIN" }),
+      await createLink(users.ADMIN.id),
+      await peek(created.body.token),
+      await reset(created.body.token),
+    ];
+
+    for (const res of responses) {
+      expect(res.text).not.toContain(hash);
+      expect(res.text).not.toContain("resetTokenHash");
+      expect(res.text).not.toContain("resetExpiresAt");
+      expect(res.text).not.toContain("passwordHash");
+    }
+  });
+
+  it("the logs never contain a token, a password or the email", async () => {
+    const lines = [];
+    for (const level of ["info", "warn", "error"]) {
+      jest.spyOn(logger, level).mockImplementation((message, fields) => lines.push(JSON.stringify({ message, ...fields })));
+    }
+
+    const created = await createLink(users.VIEWER.id);
+    await peek(created.body.token);
+    await reset(created.body.token, "Sangat-Rahasia-77");
+    await reset(created.body.token, "Sangat-Rahasia-77");
+    await peek("x".repeat(43));
+    const logs = lines.join("\n");
+
+    expect(logs).toMatch(/\/api\/auth\/reset-password\/:token/);
+    expect(logs).toMatch(/\/api\/members\/:id\/reset-link/);
+    for (const secret of [created.body.token, hashToken(created.body.token), "Sangat-Rahasia-77", "viewer-a@example.com"]) {
+      expect(logs).not.toContain(secret);
+    }
   });
 });
