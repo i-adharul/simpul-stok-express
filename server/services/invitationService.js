@@ -37,8 +37,10 @@ const toInvitation = (row, now) => ({
 // block the invitation too (one user belongs to one organization), so this goes through
 // helpers/userAccess.js. Only an inactive member of the SAME organization may be invited again
 // (the new acceptance reactivates that user, BL06). Anything else is a 409 with one message.
-async function assertEmailFree(ctx, email) {
-  const user = await findUserByEmail(email);
+async function assertEmailFree(ctx, email, transaction) {
+  // Read inside the caller's transaction: a read outside it would ask the pool for a SECOND connection
+  // while this transaction holds one, and many simultaneous invitations could starve the pool.
+  const user = await findUserByEmail(email, { transaction });
   if (!user) return;
   const sameOrganization = user.organizationId === ctx.organizationId;
   if (sameOrganization && !user.isActive) return;
@@ -84,7 +86,7 @@ function create(ctx, { email, role, warehouseIds }) {
   return inTransaction(async (transaction) => {
     await lockOrganization(ctx.organizationId, transaction);
     await assertWarehouses(ctx, warehouseIds, transaction);
-    await assertEmailFree(ctx, email);
+    await assertEmailFree(ctx, email, transaction);
     await assertNoPending(ctx, email, transaction);
     await assertWithinLimit(ctx.organizationId, "MEMBER", { transaction });
 
