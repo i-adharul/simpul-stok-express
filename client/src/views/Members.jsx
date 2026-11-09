@@ -3,9 +3,12 @@ import { ROLE_LABELS } from '../constants/navigation'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import InvitationLinkModal from '../components/InvitationLinkModal'
 import InviteMemberModal from '../components/InviteMemberModal'
 import Pagination from '../components/Pagination'
 import { formatDateTime, timeRemaining } from '../utils/format'
+import { GENERIC_ERROR, errorText } from '../utils/apiError'
+import http from '../utils/http'
 import { toast } from '../utils/toast'
 import { useActiveWarehouses } from '../utils/useActiveWarehouses'
 import { usePagedList } from '../utils/usePagedList'
@@ -66,7 +69,7 @@ function MembersTable({ list, activeCount }) {
   )
 }
 
-function InvitationsTable({ list }) {
+function InvitationsTable({ list, onCancel, cancellingId }) {
   const { data, loading, page, setPage } = list
   return (
     <div className={`rounded-xl border border-base-300 bg-base-100 ${loading ? 'opacity-60' : ''}`}>
@@ -78,6 +81,7 @@ function InvitationsTable({ list }) {
               <th>Peran</th>
               <th>Kedaluwarsa dalam</th>
               <th>Status</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -90,6 +94,11 @@ function InvitationsTable({ list }) {
                 <td className="text-base-content/70">{timeRemaining(i.expiresAt)}</td>
                 <td>
                   <span className={`badge badge-soft ${i.status === 'EXPIRED' ? 'badge-error' : 'badge-warning'}`}>{i.status === 'EXPIRED' ? 'Kedaluwarsa' : 'Menunggu'}</span>
+                </td>
+                <td className="text-right">
+                  <button type="button" className="btn btn-ghost btn-xs text-error" disabled={cancellingId === i.id} onClick={() => onCancel(i)}>
+                    Batalkan
+                  </button>
                 </td>
               </tr>
             ))}
@@ -109,12 +118,28 @@ export default function Members() {
   const { warehouses, error: warehousesError, retry: retryWarehouses } = useActiveWarehouses()
   const activeCount = warehouses?.total ?? 0
   const [inviting, setInviting] = useState(false)
+  // The 201 answer ({ invitation, token }) while P08 is open; dropped on close so the token is gone.
+  const [created, setCreated] = useState(null)
+  const [cancellingId, setCancellingId] = useState(null)
 
-  // 201: the invitation list reloads. The link popup (P08) is opened from here in the next step.
-  function handleCreated() {
+  function handleCreated(answer) {
     setInviting(false)
-    toast.success('Undangan dibuat.')
+    setCreated(answer)
     invitations.reload()
+  }
+
+  // DELETE removes the row, so the link stops working. 404 means it is already gone: reload either way.
+  async function cancelInvitation(invitation) {
+    setCancellingId(invitation.id)
+    try {
+      await http.delete(`/api/invitations/${invitation.id}`)
+      toast.success('Undangan dibatalkan.')
+    } catch (error) {
+      if (error.response?.status !== 404) toast.error(errorText(error) ?? GENERIC_ERROR)
+    } finally {
+      setCancellingId(null)
+      invitations.reload()
+    }
   }
 
   return (
@@ -141,9 +166,10 @@ export default function Members() {
       <section className="space-y-3">
         <h2 className="font-bold">Undangan tertunda{invitations.data ? ` (${invitations.data.total})` : ''}</h2>
         <ListState list={invitations} emptyMessage="Tidak ada undangan tertunda.">
-          <InvitationsTable list={invitations} />
+          <InvitationsTable list={invitations} onCancel={cancelInvitation} cancellingId={cancellingId} />
         </ListState>
       </section>
+      {created && <InvitationLinkModal path={`/invite/${created.token}`} email={created.invitation.email} role={created.invitation.role} onClose={() => setCreated(null)} />}
       {inviting && <InviteMemberModal warehouses={warehouses.items} onCreated={handleCreated} onClose={() => setInviting(false)} />}
     </div>
   )
