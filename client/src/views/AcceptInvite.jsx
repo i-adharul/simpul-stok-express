@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
+import ErrorState from '../components/ErrorState'
 import FormField from '../components/FormField'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { ROLE_LABELS } from '../constants/navigation'
@@ -14,6 +15,20 @@ function BrandHeader() {
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-primary-content">S</div>
       <span className="text-2xl font-bold">Simpul</span>
       <span className="badge badge-primary badge-soft badge-sm">Stok</span>
+    </div>
+  )
+}
+
+// S03 expired variant: one message for an expired, used, unknown or malformed link (the API answers 404 for all).
+function ExpiredCard() {
+  return (
+    <div className="space-y-4 text-center">
+      <span className="material-symbols-outlined text-[40px] text-base-content/50">history</span>
+      <h1 className="text-2xl font-bold tracking-tight">Tautan undangan tidak berlaku</h1>
+      <p className="text-sm text-base-content/70">Tautan ini sudah kedaluwarsa, sudah dipakai, atau tidak valid. Minta Owner organisasi Anda mengirim tautan undangan baru.</p>
+      <Link to="/login" className="btn btn-primary w-full">
+        Ke halaman masuk
+      </Link>
     </div>
   )
 }
@@ -46,6 +61,9 @@ export default function AcceptInvite() {
   const [formError, setFormError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [invitation, setInvitation] = useState(null)
+  // 'expired' (404 from the API) or 'failed' (no answer or 5xx: the link may still be fine, so offer a retry)
+  const [problem, setProblem] = useState(null)
+  const [attempt, setAttempt] = useState(0)
   const [values, setValues] = useState({ name: '', password: '', passwordConfirm: '' })
   const [errors, setErrors] = useState({})
 
@@ -54,13 +72,22 @@ export default function AcceptInvite() {
     http
       .get(`/api/invitations/${encodeURIComponent(token)}`)
       .then(({ data }) => {
-        if (!cancelled) setInvitation(data)
+        if (cancelled) return
+        setInvitation(data)
+        setProblem(null)
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (!cancelled) setProblem(error.response?.status === 404 ? 'expired' : 'failed')
+      })
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, attempt])
+
+  function retry() {
+    setProblem(null)
+    setAttempt((n) => n + 1)
+  }
 
   function handleChange(name, value) {
     setValues((current) => ({ ...current, [name]: value }))
@@ -86,7 +113,9 @@ export default function AcceptInvite() {
       const redirectTo = await acceptInvite({ token, name: values.name.trim(), password: values.password })
       navigate(redirectTo, { replace: true })
     } catch (error) {
-      showServerError(error)
+      // The link died between the GET and the POST (used or expired meanwhile): show the expired variant.
+      if (error.response?.status === 404) setProblem('expired')
+      else showServerError(error)
       setSubmitting(false)
     }
   }
@@ -95,8 +124,10 @@ export default function AcceptInvite() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-base-200 px-6 py-10">
       <BrandHeader />
       <div className="w-full max-w-115 rounded-xl border border-base-300 bg-base-100 p-8">
-        {!invitation && <LoadingSkeleton rows={4} />}
-        {invitation && (
+        {problem === 'expired' && <ExpiredCard />}
+        {problem === 'failed' && <ErrorState message="Undangan tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi." onRetry={retry} />}
+        {!invitation && !problem && <LoadingSkeleton rows={4} />}
+        {invitation && problem !== 'expired' && (
           <>
             <h1 className="text-2xl font-bold tracking-tight">Anda diundang bergabung ke {invitation.organizationName}</h1>
             <p className="mt-1 text-sm text-base-content/70">
