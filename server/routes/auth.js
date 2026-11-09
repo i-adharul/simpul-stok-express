@@ -24,6 +24,10 @@ router.post(
 // check: the invitation row says which organization it is, and the guard needs a session.
 router.post("/auth/accept-invite", validate({ body: acceptInviteSchema }), authController.acceptInvite);
 
+// Public: the token in the URL is the proof (BL07). A read, so no subscription check. The request logger
+// prints the route pattern "/api/auth/reset-password/:token", never the token itself.
+router.get("/auth/reset-password/:token", authController.showResetPassword);
+
 // Public and without a schema: it reads no input at all (allowed in the write-route static test).
 router.post("/auth/logout", authController.logout);
 

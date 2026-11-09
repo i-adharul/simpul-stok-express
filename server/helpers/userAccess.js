@@ -11,6 +11,11 @@ const findUserByEmail = (email, options = {}) => User.findOne({ where: { email }
 const touchLastLogin = (userId) =>
   User.update({ lastLoginAt: new Date() }, { where: { id: userId } });
 
+// The user whose reset link has this hash (BL07). The reset link is public: the caller has no session, so
+// the organization is not known and this read is not tenant-scoped on purpose. `options` may carry a
+// `transaction` and a `lock` (FOR UPDATE) for the reset flow.
+const findUserByResetTokenHash = (resetTokenHash, options = {}) => User.findOne({ where: { resetTokenHash }, ...options });
+
 // The user behind a token, read again on every request together with their organization (one query),
 // so a deactivation or a status change is seen at once. Never selects secrets: the password hash
 // and the reset token stay in the database. A platform admin has no organization (null).
@@ -60,6 +65,7 @@ const savePassword = (userId, passwordHash, changedAt) =>
 
 module.exports = {
   findUserByEmail,
+  findUserByResetTokenHash,
   touchLastLogin,
   findUserById,
   findActiveWarehouseIds,

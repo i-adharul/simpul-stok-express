@@ -110,3 +110,53 @@ describe("POST /api/members/:id/reset-link", () => {
     expect(res.body.code).toBe("VALIDATION_ERROR");
   });
 });
+
+const NOT_FOUND = { code: "NOT_FOUND", message: "Data tidak ditemukan.", details: null };
+const peek = (token) => request(app).get(`/api/auth/reset-password/${token}`);
+const linkFor = async (key = "VIEWER") => (await createLink(users[key].id)).body.token;
+
+describe("GET /api/auth/reset-password/:token", () => {
+  it("is public and returns only the email, with no-store", async () => {
+    const res = await peek(await linkFor());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ email: "viewer-a@example.com" });
+    expect(res.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("an old link stops working when a new one is made", async () => {
+    const first = await linkFor();
+    const second = await linkFor();
+
+    expect((await peek(first)).status).toBe(404);
+    expect((await peek(second)).status).toBe(200);
+  });
+
+  it("an expired link is 404", async () => {
+    const token = await linkFor();
+    await sql('UPDATE "Users" SET "resetExpiresAt" = now() - interval \'1 second\' WHERE "id" = :id', { id: users.VIEWER.id });
+
+    expect((await peek(token)).status).toBe(404);
+  });
+
+  it("the link of a member deactivated afterwards is 404", async () => {
+    const token = await linkFor();
+    await sql('UPDATE "Users" SET "isActive" = false WHERE "id" = :id', { id: users.VIEWER.id });
+
+    expect((await peek(token)).status).toBe(404);
+  });
+
+  it("every kind of invalid token gets the byte-identical 404", async () => {
+    const used = await linkFor();
+    await sql('UPDATE "Users" SET "resetExpiresAt" = now() - interval \'1 second\' WHERE "id" = :id', { id: users.VIEWER.id });
+    const bodies = [];
+    for (const token of [used, "A".repeat(43), "short", "x".repeat(300), "%20", "ünïcode"]) {
+      const res = await peek(token);
+      expect(res.status).toBe(404);
+      bodies.push(res.text);
+    }
+
+    expect(new Set(bodies).size).toBe(1);
+    expect(JSON.parse(bodies[0])).toEqual(NOT_FOUND);
+  });
+});
