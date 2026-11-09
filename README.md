@@ -14,7 +14,15 @@ A sibling implementation of the same product (Next.js, TypeScript, Prisma) lives
 
 ## Status
 
-Work in progress (epic E0, repository setup). The API answers every request with a JSON `404` because no routes exist yet. The client and the database are not set up yet.
+Milestone M1 (core inventory) is complete and deployed.
+
+- Demo (client): https://simpulstok.adharul.my.id
+- API: https://simpulstok-api.adharul.my.id (`GET /api/health` shows the running commit)
+- Server tests: 123 suites, 2020 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-09). The client builds with `cd client && npm run build`. There is no CI.
+
+**Open follow-up:** the full P0 flow has **not** yet been verified end to end in production. The deployed API and client are live, but the main-flow test (E6-03) only runs against a local database.
+
+Not built yet: the subscription and payment flow (M2) and later milestones.
 
 ## Stack
 
@@ -24,7 +32,10 @@ Node.js (CommonJS), Express 5, PostgreSQL, Sequelize 6, Zod, JWT bearer auth, Je
 
 ```
 server/   Express API
+  scripts/deploy.sh    deploy on the EC2 host (pull, install, pm2 restart, health check)
+  scripts/resetDemo.js demo data reset (npm run demo:reset)
 client/   React + Vite client
+  vercel.json          rewrites every path to /index.html so deep links work
 docs/     Product and technical documents, and decisions/ (ADRs)
 ```
 
@@ -38,6 +49,10 @@ npm install
 npm run dev     # nodemon, http://localhost:3000
 npm test        # Jest and Supertest, one test file at a time
 ```
+
+Client (from `client/`): `npm run dev` for the Vite dev server, `npm run build` for the production build.
+
+Deploy (on the EC2 host, not locally): `./server/scripts/deploy.sh [branch]`. Migrations are not part of it; see [ADR 0008](docs/decisions/0008-deployment-layout.md).
 
 ## Documentation
 
