@@ -18,6 +18,7 @@ const PUBLIC_ROUTES = {
   "POST /auth/accept-invite": "Public: the person has no account yet and the token in the body is the proof. The organization comes from the invitation row found by the token hash, never from the request.",
   "GET /invitations/:token": "Public: the person who opens the link has no account yet. The token is looked up by its hash; every invalid token is one identical 404, so there is no foreign ID to swap.",
   "GET /auth/reset-password/:token": "Public: the person who opens the reset link has no session. The token is looked up by its hash; every invalid token is one identical 404, so there is no foreign ID to swap.",
+  "POST /auth/reset-password": "Public: the member has no session and the token in the body is the proof. The user is found by the token hash, never by anything from the request, and the service never uses the tenant data access.",
   "POST /auth/logout": "Reads no input and no tenant data; always answers 204.",
   "GET /me": "Acts on the caller's own user only (from the token); no ID comes from the URL or the body.",
   "PATCH /me/password": "Acts on the caller's own user only (from the token); no ID comes from the URL or the body.",

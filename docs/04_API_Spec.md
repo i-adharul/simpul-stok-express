@@ -97,6 +97,18 @@ Public (no token in the header: the token in the URL is the proof) and not subje
 | 200 | `{ "email" }` |
 | 404 | `{ "code": "NOT_FOUND", "message": "Data tidak ditemukan.", "details": null }` |
 
+### `POST /api/auth/reset-password`
+
+Public (the token in the body is the proof) and not subject to the subscription check. Body, both required and unknown keys rejected: `{ "token": string (1-200), "password": string (1-128) }`. The password rules of BL01 apply, and the password may not equal the member's email or the part before the `@`. No token is returned: the member signs in through `POST /api/auth/login`.
+
+The token is judged first (an invalid one is `404` whatever the password is), then the password rules. In one transaction the server reads the user again by the token hash with `SELECT ... FOR UPDATE` and judges the link again, then replaces the password hash, sets `passwordChangedAt` (every token that member held earlier gets `401`) and clears the reset columns (the link is single-use). Of two simultaneous uses of one link exactly one succeeds.
+
+| Status | Body |
+| ------ | ---- |
+| 204 | no body |
+| 400 | `VALIDATION_ERROR` (shape, or the reason the password is refused in `message` with `details: [{ "source": "body", "path": "password", "message" }]`) |
+| 404 | `NOT_FOUND`, identical to `GET /api/auth/reset-password/:token`: the token is malformed, unknown, replaced, used or expired, or the member is no longer active |
+
 ### `POST /api/auth/logout`
 
 Any caller, with or without a token; no body. Always `204` with no body. The server keeps no session, so nothing is revoked on the server: the client deletes its token. A token stays valid until it expires or until the password changes.

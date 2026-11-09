@@ -1,5 +1,7 @@
+const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const app = require("../app");
+const env = require("../config/env");
 const db = require("../models");
 const { signToken } = require("../helpers/jwt");
 const { hashToken } = require("../helpers/token");
@@ -158,5 +160,72 @@ describe("GET /api/auth/reset-password/:token", () => {
 
     expect(new Set(bodies).size).toBe(1);
     expect(JSON.parse(bodies[0])).toEqual(NOT_FOUND);
+  });
+});
+
+const NEW_PASSWORD = "Kopi-Gula-2027";
+const reset = (token, password = NEW_PASSWORD) => request(app).post("/api/auth/reset-password").send({ token, password });
+const login = (email, password) => request(app).post("/api/auth/login").send({ email, password });
+
+describe("POST /api/auth/reset-password", () => {
+  it("204 without a body; the new password signs in, the old one does not, the reset columns are cleared", async () => {
+    const res = await reset(await linkFor());
+
+    expect(res.status).toBe(204);
+    expect(res.text).toBe("");
+    expect((await login("viewer-a@example.com", NEW_PASSWORD)).status).toBe(200);
+    expect((await login("viewer-a@example.com", users.VIEWER.password)).status).toBe(401);
+    expect(await resetColumns(users.VIEWER.id)).toEqual({ resetTokenHash: null, resetExpiresAt: null });
+  });
+
+  it("a session token issued before the reset gets 401 afterwards", async () => {
+    // Issued a minute ago: well before the reset (whole-second comparison, docs/04).
+    const old = jwt.sign({ iat: Math.floor(Date.now() / 1000) - 60 }, env.JWT_SECRET, {
+      algorithm: "HS256",
+      subject: users.VIEWER.id,
+      expiresIn: "8h",
+    });
+    const token = await linkFor();
+    expect((await request(app).get("/api/me").set("Authorization", `Bearer ${old}`)).status).toBe(200);
+
+    await reset(token);
+
+    expect((await request(app).get("/api/me").set("Authorization", `Bearer ${old}`)).status).toBe(401);
+  });
+
+  it("the link is single-use: a second use is the identical 404", async () => {
+    const token = await linkFor();
+    expect((await reset(token)).status).toBe(204);
+
+    const again = await reset(token, "Another-Pass-2028");
+
+    expect(again.status).toBe(404);
+    expect(again.body).toEqual(NOT_FOUND);
+    expect((await login("viewer-a@example.com", NEW_PASSWORD)).status).toBe(200);
+  });
+
+  it("a refused password is 400 with its reason and the link stays usable", async () => {
+    const token = await linkFor();
+
+    const res = await reset(token, "viewer-a@example.com");
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+    expect(res.body.details).toEqual([{ source: "body", path: "password", message: res.body.message }]);
+    expect((await reset(token)).status).toBe(204);
+  });
+
+  it("an invalid token is 404 whatever the password is", async () => {
+    const res = await reset("A".repeat(43), "short");
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual(NOT_FOUND);
+  });
+
+  it("refuses unknown keys and a missing field with 400", async () => {
+    const token = await linkFor();
+
+    expect((await request(app).post("/api/auth/reset-password").send({ token, password: NEW_PASSWORD, email: "x@y.id" })).status).toBe(400);
+    expect((await request(app).post("/api/auth/reset-password").send({ token })).status).toBe(400);
   });
 });

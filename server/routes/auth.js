@@ -3,7 +3,12 @@ const authController = require("../controllers/authController");
 const organizationController = require("../controllers/organizationController");
 const noStore = require("../middlewares/noStore");
 const validate = require("../middlewares/validate");
-const { acceptInviteSchema, loginSchema, registerOrganizationSchema } = require("../schemas/auth.schema");
+const {
+  acceptInviteSchema,
+  loginSchema,
+  registerOrganizationSchema,
+  resetPasswordSchema,
+} = require("../schemas/auth.schema");
 
 const router = express.Router();
 
@@ -27,6 +32,10 @@ router.post("/auth/accept-invite", validate({ body: acceptInviteSchema }), authC
 // Public: the token in the URL is the proof (BL07). A read, so no subscription check. The request logger
 // prints the route pattern "/api/auth/reset-password/:token", never the token itself.
 router.get("/auth/reset-password/:token", authController.showResetPassword);
+
+// Public: the token in the body is the proof (BL07). No subscription check: the member has no session, and
+// a locked-out member must still be able to get back in.
+router.post("/auth/reset-password", validate({ body: resetPasswordSchema }), authController.resetPassword);
 
 // Public and without a schema: it reads no input at all (allowed in the write-route static test).
 router.post("/auth/logout", authController.logout);

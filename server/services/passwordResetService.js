@@ -1,5 +1,8 @@
-const { notFound } = require("../helpers/errors");
+const { hashPassword } = require("../helpers/bcrypt");
+const { notFound, validationError } = require("../helpers/errors");
+const { validatePassword } = require("../helpers/password");
 const { hashToken } = require("../helpers/token");
+const { inTransaction } = require("../helpers/transaction");
 const { findUserByResetTokenHash } = require("../helpers/userAccess");
 
 // BL07, the public half of the password reset: what the person who opens `/reset/<token>` needs. The
@@ -26,4 +29,33 @@ async function showByToken(token) {
   return { email: user.email };
 }
 
-module.exports = { findUsable, showByToken };
+// The password rules (helpers/password.js) with the email of the member behind the link. Same 400 shape
+// as accept-invite: the reason is the message.
+function assertPasswordAllowed(password, email) {
+  const check = validatePassword(password, { email });
+  if (check.valid) return;
+  throw validationError([{ source: "body", path: "password", message: check.message }], check.message);
+}
+
+// BL07. A usable token is checked first (an invalid one is a 404 whatever the password is), then the
+// password rules with the member's email (400). bcrypt runs before the transaction so no connection
+// waits for it. Then ONE transaction reads the user again by the token hash with FOR UPDATE and judges
+// the link again: of two simultaneous uses of one link the second waits for the first to commit, no
+// longer finds the hash (it was cleared) and gets the same 404. The new hash, `passwordChangedAt` (every
+// earlier token of that member gets 401, BL01) and the cleared reset columns commit together. No token
+// is returned: the member signs in through the login screen.
+async function resetPassword({ token, password }) {
+  const first = await findUsable(token);
+  assertPasswordAllowed(password, first.email);
+  const passwordHash = await hashPassword(password);
+
+  await inTransaction(async (transaction) => {
+    const user = await findUsable(token, { transaction, lock: transaction.LOCK.UPDATE });
+    await user.update(
+      { passwordHash, passwordChangedAt: new Date(), resetTokenHash: null, resetExpiresAt: null },
+      { transaction },
+    );
+  });
+}
+
+module.exports = { findUsable, showByToken, resetPassword };

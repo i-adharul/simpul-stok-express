@@ -19,10 +19,16 @@ async function showResetPassword(req, res) {
   res.status(200).json(await passwordResetService.showByToken(req.params.token));
 }
 
+// Public: the token in the body is the proof. 204 and no token: the member signs in through S01.
+async function resetPassword(req, res) {
+  await passwordResetService.resetPassword(req.valid.body);
+  res.status(204).end();
+}
+
 // The server keeps no session, so there is nothing to revoke: the client deletes its token. The
 // answer does not depend on the token, so a client with an expired token can still "log out".
 function logout(req, res) {
   res.status(204).end();
 }
 
-module.exports = { login, acceptInvite, showResetPassword, logout };
+module.exports = { login, acceptInvite, showResetPassword, resetPassword, logout };
