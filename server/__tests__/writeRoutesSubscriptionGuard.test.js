@@ -12,6 +12,8 @@ const ALLOWED_WITHOUT_GUARD = [
   "POST /auth/logout",
   // BL04: a new customer has no organization yet, so there is no subscription to check.
   "POST /auth/register-organization",
+  // BL06: the person has no session yet; the token in the body is the proof.
+  "POST /auth/accept-invite",
   "PATCH /me/password",
 ];
 
