@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import ErrorState from '../components/ErrorState'
 import FormField from '../components/FormField'
+import PlanLimitNotice from '../components/PlanLimitNotice'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { ROLE_LABELS } from '../constants/navigation'
 import { useAuth } from '../context/authContext'
-import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
+import { GENERIC_ERROR, errorText, fieldErrorsFrom, isPlanLimit } from '../utils/apiError'
 import http from '../utils/http'
 import { PASSWORD_HINT, validateAccept } from '../utils/registerForm'
 
@@ -34,13 +35,14 @@ function ExpiredCard() {
 }
 
 // S03, the form: the email is read-only (it comes from the invitation), the rest is typed here.
-function AcceptForm({ invitation, values, errors, formError, submitting, onChange, onSubmit }) {
+function AcceptForm({ invitation, values, errors, formError, planLimit, submitting, onChange, onSubmit }) {
   return (
     <form className="mt-6 space-y-5" noValidate onSubmit={onSubmit}>
       <FormField id="email" label="Email terdaftar" readOnly value={invitation.email} hint="Dari undangan." />
       <FormField id="name" label="Nama lengkap" required maxLength={100} autoComplete="name" value={values.name} onChange={(e) => onChange('name', e.target.value)} error={errors.name} />
       <FormField id="password" label="Password baru" required type="password" maxLength={128} autoComplete="new-password" hint={PASSWORD_HINT} value={values.password} onChange={(e) => onChange('password', e.target.value)} error={errors.password} />
       <FormField id="passwordConfirm" label="Konfirmasi password" required type="password" maxLength={128} autoComplete="new-password" value={values.passwordConfirm} onChange={(e) => onChange('passwordConfirm', e.target.value)} error={errors.passwordConfirm} />
+      {planLimit && <PlanLimitNotice message={planLimit} />}
       {formError && (
         <p role="alert" className="text-sm font-medium text-error">
           {formError}
@@ -59,6 +61,7 @@ export default function AcceptInvite() {
   const { acceptInvite } = useAuth()
   const navigate = useNavigate()
   const [formError, setFormError] = useState(null)
+  const [planLimit, setPlanLimit] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [invitation, setInvitation] = useState(null)
   // 'expired' (404 from the API) or 'failed' (no answer or 5xx: the link may still be fine, so offer a retry)
@@ -96,6 +99,10 @@ export default function AcceptInvite() {
 
   // 400 names the field (the password reason); 409 and 403 (plan limit) carry a message for the whole form.
   function showServerError(error) {
+    if (isPlanLimit(error)) {
+      setPlanLimit(error.response.data.message)
+      return
+    }
     const fields = fieldErrorsFrom(error)
     setErrors(fields)
     if (Object.keys(fields).length === 0) setFormError(errorText(error) ?? GENERIC_ERROR)
@@ -107,6 +114,7 @@ export default function AcceptInvite() {
     const found = validateAccept(values)
     setErrors(found)
     setFormError(null)
+    setPlanLimit(null)
     if (Object.keys(found).length > 0) return
     setSubmitting(true)
     try {
@@ -133,7 +141,7 @@ export default function AcceptInvite() {
             <p className="mt-1 text-sm text-base-content/70">
               Peran: <strong>{ROLE_LABELS[invitation.role] ?? invitation.role}</strong>. Lengkapi data akun di bawah ini.
             </p>
-            <AcceptForm invitation={invitation} values={values} errors={errors} formError={formError} submitting={submitting} onChange={handleChange} onSubmit={handleSubmit} />
+            <AcceptForm invitation={invitation} values={values} errors={errors} formError={formError} planLimit={planLimit} submitting={submitting} onChange={handleChange} onSubmit={handleSubmit} />
           </>
         )}
       </div>

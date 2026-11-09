@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import FormField from './FormField'
-import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
+import PlanLimitNotice from './PlanLimitNotice'
+import { GENERIC_ERROR, errorText, fieldErrorsFrom, isPlanLimit } from '../utils/apiError'
 import http from '../utils/http'
 
 const ROLES = [
@@ -17,6 +18,7 @@ function validate({ email, role }) {
 
 // A 409 or 400 names a field in details; anything else (for example PLAN_LIMIT_REACHED) is shown as text.
 function serverErrors(error) {
+  if (isPlanLimit(error)) return { planLimit: error.response.data.message }
   const byField = fieldErrorsFrom(error)
   if (Object.keys(byField).length > 0) return byField
   return { general: errorText(error) ?? GENERIC_ERROR }
@@ -96,6 +98,7 @@ export default function InviteMemberModal({ warehouses, onCreated, onClose }) {
           )}
           <p className="text-xs text-base-content/60">Pilih satu atau lebih gudang yang dapat diakses oleh anggota.</p>
         </fieldset>
+        {errors.planLimit && <PlanLimitNotice message={errors.planLimit} />}
         {errors.general && (
           <p role="alert" className="text-sm font-medium text-error">
             {errors.general}

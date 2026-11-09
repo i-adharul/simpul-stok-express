@@ -8,7 +8,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton'
 import InvitationLinkModal from '../components/InvitationLinkModal'
 import InviteMemberModal from '../components/InviteMemberModal'
 import Pagination from '../components/Pagination'
-import { formatDateTime, timeRemaining } from '../utils/format'
+import { formatDateTime, formatNumber, timeRemaining } from '../utils/format'
 import { GENERIC_ERROR, errorText } from '../utils/apiError'
 import http from '../utils/http'
 import { toast } from '../utils/toast'
@@ -187,6 +187,11 @@ export default function Members() {
         <div>
           <h1 className="text-2xl font-bold">Anggota</h1>
           <p className="text-sm text-base-content/70">Kelola izin hak akses dan penugasan lokasi gudang untuk operasional staf.</p>
+          {members.data?.usage && (
+            <p className="mt-1 text-sm font-semibold">
+              {formatNumber(members.data.usage.used)} dari {formatNumber(members.data.usage.limit)} anggota
+            </p>
+          )}
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setInviting(true)} disabled={!warehouses}>
           Undang anggota

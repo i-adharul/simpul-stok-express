@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import FormField from './FormField'
+import PlanLimitNotice from './PlanLimitNotice'
 import { UNIT_LABELS } from '../constants/units'
-import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
+import { GENERIC_ERROR, errorText, fieldErrorsFrom, isPlanLimit } from '../utils/apiError'
 
 const MAX_MIN_STOCK = 1_000_000_000
 
@@ -24,6 +25,7 @@ function validateProduct({ sku, name, unit, minStock }) {
 // 409 "SKU sudah dipakai." belongs under the SKU field; a 400 maps by field path.
 function serverErrors(error) {
   const status = error.response?.status
+  if (isPlanLimit(error)) return { planLimit: error.response.data.message }
   if (status === 409) return { sku: error.response.data.message }
   if (status === 400) {
     const byField = fieldErrorsFrom(error)
@@ -96,6 +98,7 @@ export default function ProductFormModal({ product, onSubmit, onClose }) {
           <FormField id="product-min-stock" label="Batas stok minimum" required inputMode="numeric" value={values.minStock} onChange={set('minStock')} error={errors.minStock} />
         </div>
         <p className="text-xs text-base-content/60">Peringatan muncul jika stok di bawah angka ini.</p>
+        {errors.planLimit && <PlanLimitNotice message={errors.planLimit} />}
         {errors.general && (
           <p role="alert" className="text-sm font-medium text-error">
             {errors.general}
