@@ -1,11 +1,16 @@
 const jwt = require("jsonwebtoken");
-const { UniqueConstraintError, ValidationError } = require("sequelize");
+const {
+  ConnectionAcquireTimeoutError,
+  UniqueConstraintError,
+  ValidationError,
+} = require("sequelize");
 const { logger } = require("../helpers/logger");
 const {
   AppError,
   conflict,
   internalError,
   notFound,
+  serviceUnavailable,
   unauthenticated,
   validationError,
 } = require("../helpers/errors");
@@ -28,6 +33,9 @@ const isBodyParserError = (err) =>
 // cause (SQL, stack, library message) can never reach the response body (BL29).
 function toAppError(err) {
   if (err instanceof AppError) return err;
+  // Pool exhausted: tell the client to retry instead of a generic 500 (no pool detail leaks).
+  if (err instanceof ConnectionAcquireTimeoutError)
+    return serviceUnavailable();
   // UniqueConstraintError extends ValidationError, so it must be checked first.
   if (err instanceof UniqueConstraintError)
     return conflict("Data sudah ada.");

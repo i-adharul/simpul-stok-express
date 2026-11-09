@@ -1,3 +1,4 @@
+const fs = require("fs");
 const env = require("./env");
 
 // sequelize-cli reads this file (see .sequelizerc). It is a .js file, not
@@ -22,7 +23,16 @@ module.exports = {
   production: {
     ...base,
     url: env.DATABASE_URL,
-    // Supabase only accepts TLS connections. Certificate pinning is decided at deploy (E6-04).
-    dialectOptions: { ssl: { require: true, rejectUnauthorized: false } },
+    // Supabase only accepts TLS connections. The server certificate and host name are always
+    // verified; the CA file comes from DATABASE_CA_PATH, which production requires (ADR 0007).
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: true,
+        ...(env.DATABASE_CA_PATH && {
+          ca: fs.readFileSync(env.DATABASE_CA_PATH, "utf8"),
+        }),
+      },
+    },
   },
 };

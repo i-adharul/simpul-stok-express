@@ -15,7 +15,14 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]),
   PORT: z.coerce.number().int().min(1).max(65535),
   DATABASE_URL: postgresUrl,
-  TEST_DATABASE_URL: postgresUrl,
+  // Only tests need it (they empty their tables); a production host has no test database.
+  TEST_DATABASE_URL: postgresUrl.optional(),
+  // Path to the CA certificate that signs the production database's TLS certificate. Required in
+  // production so the connection always verifies the server (ADR 0007). Null when unset.
+  DATABASE_CA_PATH: z
+    .string()
+    .optional()
+    .transform((value) => value || null),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().min(1),
   CORS_ORIGIN: origins,
@@ -29,6 +36,27 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  // Password for the seeded demo accounts. Null means the public local demo password is used,
+  // which the seeders refuse on a remote database (helpers/seedGuard.js).
+  SEED_PASSWORD: z
+    .string()
+    .optional()
+    .transform((value) => value || null),
+}).superRefine((value, ctx) => {
+  if (value.NODE_ENV === "test" && !value.TEST_DATABASE_URL) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["TEST_DATABASE_URL"],
+      message: "is required when NODE_ENV is test",
+    });
+  }
+  if (value.NODE_ENV === "production" && !value.DATABASE_CA_PATH) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["DATABASE_CA_PATH"],
+      message: "is required when NODE_ENV is production",
+    });
+  }
 });
 
 // Pure on purpose: takes any object, so tests do not touch process.env.

@@ -38,4 +38,31 @@ describe("config/config.js (sequelize-cli)", () => {
       expect(config[name].dialect).toBe("postgres");
     }
   });
+
+  it("verifies the server certificate in production with the CA file from DATABASE_CA_PATH", () => {
+    const os = require("os");
+    const fs = require("fs");
+    const path = require("path");
+    const caFile = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "ca-")),
+      "ca.crt",
+    );
+    fs.writeFileSync(caFile, "FAKE CA CONTENT");
+    process.env.DATABASE_CA_PATH = caFile;
+
+    let production;
+    jest.isolateModules(() => {
+      production = require("../config/config").production;
+    });
+    delete process.env.DATABASE_CA_PATH;
+
+    expect(production.dialectOptions.ssl.rejectUnauthorized).toBe(true);
+    expect(production.dialectOptions.ssl.ca).toBe("FAKE CA CONTENT");
+  });
+
+  it("never turns certificate verification off", () => {
+    expect(config.production.dialectOptions.ssl.rejectUnauthorized).not.toBe(
+      false,
+    );
+  });
 });

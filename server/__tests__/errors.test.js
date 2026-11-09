@@ -3,7 +3,7 @@ const errors = require("../helpers/errors");
 const { AppError, ERROR_CODES } = errors;
 
 describe("error codes", () => {
-  it("are exactly the 11 documented codes", () => {
+  it("are exactly the 12 documented codes", () => {
     expect(Object.values(ERROR_CODES).sort()).toEqual(
       [
         "CONFLICT",
@@ -14,6 +14,7 @@ describe("error codes", () => {
         "INVALID_CURRENT_PASSWORD",
         "NOT_FOUND",
         "PLAN_LIMIT_REACHED",
+        "SERVICE_UNAVAILABLE",
         "SUBSCRIPTION_READ_ONLY",
         "UNAUTHENTICATED",
         "VALIDATION_ERROR",
@@ -66,6 +67,7 @@ describe("status mapping", () => {
     ["CONFLICT", 409],
     ["INSUFFICIENT_STOCK", 409],
     ["INTERNAL_ERROR", 500],
+    ["SERVICE_UNAVAILABLE", 503],
   ])("%s answers %i", (code, status) => {
     expect(new AppError(code, "x").status).toBe(status);
   });
@@ -95,6 +97,7 @@ describe("builders", () => {
     ["notFound", "NOT_FOUND"],
     ["conflict", "CONFLICT"],
     ["internalError", "INTERNAL_ERROR"],
+    ["serviceUnavailable", "SERVICE_UNAVAILABLE"],
   ])("%s builds an AppError with code %s and an Indonesian default message", (name, code) => {
     const err = errors[name]();
 
