@@ -24,8 +24,28 @@ const findOrganization = (organizationId, options = {}) =>
 const updateOrganization = (organizationId, values) =>
   Organization.update(values, { where: { id: organizationId } });
 
+// The plan the organization is on now: its Subscription, then the Plan row (a trial points at Starter,
+// E7-01). Null when the organization has no subscription. Plan is a global table, so it is not
+// reachable through tenantScope; this is the one door to it for the limits.
+const findPlanOf = async (organizationId, options = {}) => {
+  const subscription = await Subscription.findOne({
+    where: { organizationId },
+    include: [{ model: Plan, attributes: ["name", "maxWarehouses", "maxProducts", "maxMembers"] }],
+    ...options,
+  });
+  return subscription?.Plan ?? null;
+};
+
+// SELECT ... FOR UPDATE on the organization row: the serialization point of everything that adds a
+// warehouse, a product or a member (BL20). Must run inside the caller's transaction, otherwise the
+// lock would be released at once.
+const lockOrganizationRow = (organizationId, transaction) =>
+  Organization.findByPk(organizationId, { attributes: ["id"], transaction, lock: transaction.LOCK.UPDATE });
+
 module.exports = {
   findPlanByName,
+  findPlanOf,
+  lockOrganizationRow,
   insertOrganization,
   insertUser,
   insertSubscription,
