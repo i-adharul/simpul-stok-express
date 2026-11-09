@@ -8,6 +8,7 @@ import Login from './views/Login'
 import Register from './views/Register'
 import Profile from './views/Profile'
 import OrganizationSettings from './views/OrganizationSettings'
+import Members from './views/Members'
 import StockSummary from './views/StockSummary'
 import Movements from './views/Movements'
 import Warehouses from './views/Warehouses'
@@ -37,6 +38,7 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route element={<RoleRoute roles={['OWNER']} />}>
                 <Route path="settings" element={<OrganizationSettings />} />
+                <Route path="members" element={<Members />} />
               </Route>
               <Route path="stock" element={<StockSummary />} />
               <Route path="movements" element={<Movements />} />
