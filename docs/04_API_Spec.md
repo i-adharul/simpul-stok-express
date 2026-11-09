@@ -178,6 +178,17 @@ The change applies on the member's next request, because role and status are rea
 | 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin; or a warehouse in `warehouseIds` is missing, archived or of another organization (identical answers) |
 | 409 | `CONFLICT`: the target is the Owner (every change to an Owner is refused, so the last Owner can never be deactivated or demoted) |
 
+### `POST /api/members/:id/reset-link`
+
+Owner only (`member.manage`; other roles get `403` before the ID is looked at). No body (an empty object is accepted, any key is `400`). Creates a one-time password reset link for **another active member** of the organization (BL07). The token is 32 random bytes in base64url; only its SHA-256 hash and the expiry (now + 1 day) are stored. The member row is locked, and the new hash overwrites the old one, so creating a new link cancels the previous link at once. The response carries `Cache-Control: no-store`.
+
+| Status | Body |
+| ------ | ---- |
+| 201 | `{ "token", "expiresAt" }`. This is the only response that ever holds the raw token; no response holds the stored hash. The client builds the link `/reset/<token>` |
+| 400 | `VALIDATION_ERROR` (the body has a key) |
+| 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin (one identical answer) |
+| 409 | `CONFLICT`: the target is the Owner (the caller) or an inactive member |
+
 ### `POST /api/invitations`
 
 Owner only (`member.manage`; other roles get `403` before the body is read). Body (strict): `email` (valid, trimmed, stored lowercase), `role` (`WAREHOUSE_ADMIN` or `VIEWER`; `OWNER` is `400`) and `warehouseIds` (UUIDs, no duplicates, at most 200, may be empty or left out).
