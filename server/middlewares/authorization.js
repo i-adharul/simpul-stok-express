@@ -46,4 +46,14 @@ function requireRole(action) {
   return authorizeRole;
 }
 
-module.exports = { requireCan, requireRole };
+// Guards /api/platform/*: only a Platform admin passes, every tenant role gets 403. It needs
+// req.ctx, so authentication runs first (no token is a 401 there). It looks at the role only, so
+// it runs before any data is read. The role name is checked here, not in permissions.js, because
+// platform routes are not tenant actions: the matrix deliberately lists no role for the platform.
+function requirePlatformAdmin(req, res, next) {
+  if (!req.ctx) throw new Error("requirePlatformAdmin needs req.ctx: put authentication before it");
+  if (req.ctx.role !== "PLATFORM_ADMIN") return next(forbidden());
+  return next();
+}
+
+module.exports = { requireCan, requireRole, requirePlatformAdmin };
