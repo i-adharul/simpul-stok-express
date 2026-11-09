@@ -8,16 +8,18 @@ const ORG_ACTIONS = [
   "member.manage",
   "subscription.manage",
   "transfer.destinations",
+  "organization.read",
+  "organization.manage",
 ];
 const WAREHOUSE_ACTIONS = ["stock.read", "history.read", "stock.receive", "stock.adjust", "stock.transfer"];
 
 describe("the permission matrix", () => {
-  it("has exactly the 12 actions of the spec, and no other", () => {
+  it("has exactly the 14 actions of the spec, and no other", () => {
     expect(Object.keys(ACTIONS).sort()).toEqual([...ORG_ACTIONS, ...WAREHOUSE_ACTIONS].sort());
-    expect(Object.keys(ACTIONS)).toHaveLength(12);
+    expect(Object.keys(ACTIONS)).toHaveLength(14);
   });
 
-  it("marks 7 actions as organization-level and 5 as warehouse-level", () => {
+  it("marks 9 actions as organization-level and 5 as warehouse-level", () => {
     const level = (wanted) => Object.keys(ACTIONS).filter((a) => ACTIONS[a].level === wanted).sort();
 
     expect(level("organization")).toEqual([...ORG_ACTIONS].sort());
@@ -36,8 +38,14 @@ describe("the permission matrix", () => {
 });
 
 describe("roleAllows: who may do what (role alone)", () => {
-  const OWNER_ONLY = ["warehouse.manage", "product.manage", "member.manage", "subscription.manage"];
-  const READ_ALL = ["warehouse.read", "product.read", "stock.read", "history.read"];
+  const OWNER_ONLY = [
+    "warehouse.manage",
+    "product.manage",
+    "member.manage",
+    "subscription.manage",
+    "organization.manage",
+  ];
+  const READ_ALL = ["warehouse.read", "product.read", "stock.read", "history.read", "organization.read"];
   const WRITE_STOCK = ["stock.receive", "stock.adjust", "stock.transfer", "transfer.destinations"];
 
   it.each([...ORG_ACTIONS, ...WAREHOUSE_ACTIONS])("Owner may %s", (action) => {
