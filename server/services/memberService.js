@@ -4,6 +4,7 @@ const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
+const { getEffectiveLimits, getUsage } = require("./planLimitService");
 const { lockWarehouse } = require("./warehouseLock");
 
 // Members of the organization (BL07). It knows nothing about HTTP: the controller passes the
@@ -68,7 +69,15 @@ async function list(ctx, query) {
     }),
   ]);
   const warehouses = await assignedWarehouses(ctx, rows.map((row) => row.id));
-  return pageBody(rows.map((row) => toMember(row, warehouses.get(row.id))), total, query);
+  const usage = await memberUsage(ctx);
+  return { ...pageBody(rows.map((row) => toMember(row, warehouses.get(row.id))), total, query), usage };
+}
+
+// The member indicator of S14 (BL20): ACTIVE users against the effective member limit. It counts
+// active users only, so an inactive member in the list does not use a slot, and the Owner does.
+async function memberUsage(ctx) {
+  const [usage, limits] = await Promise.all([getUsage(ctx.organizationId), getEffectiveLimits(ctx.organizationId)]);
+  return { used: usage.MEMBER, limit: limits.MEMBER };
 }
 
 // Replaces the assignment of the member as a whole (BL10): every wanted warehouse is locked in ID order

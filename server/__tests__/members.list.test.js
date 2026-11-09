@@ -5,7 +5,7 @@ const { signToken } = require("../helpers/jwt");
 const { getSequelize } = require("./support/db");
 const { clearTables } = require("./support/clearTables");
 const { createAccount } = require("./support/accounts");
-const { createOrganization, createWarehouse, assignWarehouse } = require("./support/factories");
+const { createOrganization, createWarehouse, assignWarehouse, giveRoomyPlan } = require("./support/factories");
 
 jest.setTimeout(30000);
 
@@ -19,6 +19,7 @@ beforeEach(async () => {
   await clearTables(getSequelize());
   orgA = await createOrganization("tokoa");
   orgB = await createOrganization("tokob");
+  await giveRoomyPlan(orgA, orgB);
   users = {
     OWNER: await createAccount({ email: "owner-a@example.com", name: "Zahra Owner", role: "OWNER", organizationId: orgA }),
     WAREHOUSE_ADMIN: await createAccount({ email: "admin-a@example.com", name: "Sari Admin", role: "WAREHOUSE_ADMIN", organizationId: orgA }),
