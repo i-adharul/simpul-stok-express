@@ -42,6 +42,7 @@ describe("AppError", () => {
     ["notFound", 404, "NOT_FOUND"],
     ["conflict", 409, "CONFLICT"],
     ["internalError", 500, "INTERNAL_ERROR"],
+    ["serviceUnavailable", 503, "SERVICE_UNAVAILABLE"],
   ])("%s is answered with %i %s", async (builder, status, code) => {
     const res = await call(() => {
       throw errors[builder]();
@@ -116,6 +117,19 @@ describe("Sequelize errors", () => {
 
     expectBody(res, 500, "INTERNAL_ERROR");
     expect(JSON.stringify(res.body)).not.toMatch(/SELECT|users|relation/);
+  });
+});
+
+describe("connection pool exhaustion", () => {
+  it("a connection acquire timeout is 503 SERVICE_UNAVAILABLE with no cause", async () => {
+    const res = await call(() => {
+      throw new Sequelize.ConnectionAcquireTimeoutError(
+        new Error("timeout acquiring postgres://u:secret@db.example.com/x"),
+      );
+    });
+
+    expectBody(res, 503, "SERVICE_UNAVAILABLE");
+    expect(JSON.stringify(res.body)).not.toMatch(/secret|postgres:|acquiring/);
   });
 });
 

@@ -104,6 +104,7 @@ Every error body is `{ code, message, details }` (BL29), with no stack trace. `m
 | `CONFLICT`                 | 409    | The request is valid but the current state refuses it (duplicate code or SKU, archived target, stock still present, quantity limit).                                          |
 | `INSUFFICIENT_STOCK`       | 409    | A transfer needs more than the source holds; `details: { "productId" }`.                                                                                                      |
 | `INTERNAL_ERROR`           | 500    | Unexpected failure. No cause in the body.                                                                                                                                     |
+| `SERVICE_UNAVAILABLE`      | 503    | The server cannot take the request now (the database connection pool is full). Retry later. No cause in the body.                                                             |
 
 Every tenant endpoint below also answers `401 UNAUTHENTICATED`, `403 FORBIDDEN` for a platform admin (a platform admin has no organization), `400 VALIDATION_ERROR` for invalid input and `500 INTERNAL_ERROR`; these are not repeated in each table. A role without the right gets `403` before the query or body is validated.
 

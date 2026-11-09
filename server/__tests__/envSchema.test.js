@@ -31,7 +31,9 @@ describe("parseEnv", () => {
     ]);
   });
 
-  it.each(Object.keys(valid))("throws when %s is missing", (key) => {
+  const required = Object.keys(valid).filter((key) => key !== "TEST_DATABASE_URL");
+
+  it.each(required)("throws when %s is missing", (key) => {
     const source = { ...valid };
     delete source[key];
 
@@ -107,6 +109,46 @@ describe("COMMIT_SHA", () => {
   it("keeps the value when it is set", () => {
     expect(parseEnv({ ...valid, COMMIT_SHA: "abc1234" }).COMMIT_SHA).toBe(
       "abc1234",
+    );
+  });
+});
+
+describe("parseEnv: production deploy variables", () => {
+  const production = {
+    ...valid,
+    NODE_ENV: "production",
+    DATABASE_CA_PATH: "/home/ubuntu/certs/prod-ca-2021.crt",
+  };
+  delete production.TEST_DATABASE_URL;
+
+  it("does not need TEST_DATABASE_URL outside the test environment", () => {
+    expect(() => parseEnv(production)).not.toThrow();
+    const { TEST_DATABASE_URL, ...development } = valid;
+    expect(() => parseEnv(development)).not.toThrow();
+  });
+
+  it("needs TEST_DATABASE_URL when NODE_ENV is test", () => {
+    const { TEST_DATABASE_URL, ...rest } = valid;
+
+    expect(() => parseEnv({ ...rest, NODE_ENV: "test" })).toThrow(
+      "TEST_DATABASE_URL",
+    );
+  });
+
+  it("needs DATABASE_CA_PATH in production, so the certificate is always verified", () => {
+    const { DATABASE_CA_PATH, ...rest } = production;
+
+    expect(() => parseEnv(rest)).toThrow("DATABASE_CA_PATH");
+  });
+
+  it("does not need DATABASE_CA_PATH outside production", () => {
+    expect(parseEnv(valid).DATABASE_CA_PATH).toBeNull();
+  });
+
+  it("reads SEED_PASSWORD as optional and keeps it out of error messages", () => {
+    expect(parseEnv(valid).SEED_PASSWORD).toBeNull();
+    expect(parseEnv({ ...valid, SEED_PASSWORD: "Abc12345xyz" }).SEED_PASSWORD).toBe(
+      "Abc12345xyz",
     );
   });
 });

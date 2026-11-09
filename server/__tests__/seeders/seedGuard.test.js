@@ -1,5 +1,9 @@
 const { Sequelize } = require("sequelize");
-const { assertSeedAllowed, isLocalHost } = require("../../helpers/seedGuard");
+const {
+  assertSeedAllowed,
+  isLocalHost,
+  resolveSeedPassword,
+} = require("../../helpers/seedGuard");
 const plans = require("../../seeders/20261105000100-plans");
 const baseAccounts = require("../../seeders/20261105000200-base-accounts");
 
@@ -76,4 +80,69 @@ describe.each([
       expect(sequelize.query).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("resolveSeedPassword", () => {
+  const DEMO = "Simpul-Demo-2026";
+  const STRONG = "Kd9-vR4wQz-77-prod";
+  const local = () =>
+    new Sequelize("postgres://u@localhost:5432/simpul_dev", {
+      dialect: "postgres",
+      logging: false,
+    });
+
+  it("falls back to the public demo password on a local database", () => {
+    expect(resolveSeedPassword(local(), { seedPassword: null, demoPassword: DEMO })).toBe(DEMO);
+  });
+
+  it("uses SEED_PASSWORD on a local database when it is set", () => {
+    expect(resolveSeedPassword(local(), { seedPassword: STRONG, demoPassword: DEMO })).toBe(STRONG);
+  });
+
+  it("uses a strong SEED_PASSWORD on a remote database", () => {
+    expect(resolveSeedPassword(fakeRemote(), { seedPassword: STRONG, demoPassword: DEMO })).toBe(STRONG);
+  });
+
+  it("refuses a remote database without SEED_PASSWORD", () => {
+    expect(() =>
+      resolveSeedPassword(fakeRemote(), { seedPassword: null, demoPassword: DEMO }),
+    ).toThrow(/SEED_PASSWORD/);
+  });
+
+  it("refuses the public demo password on a remote database", () => {
+    expect(() =>
+      resolveSeedPassword(fakeRemote(), { seedPassword: DEMO, demoPassword: DEMO }),
+    ).toThrow(/public demo password/);
+  });
+
+  it("refuses a weak SEED_PASSWORD on a remote database without echoing it", () => {
+    expect(() =>
+      resolveSeedPassword(fakeRemote(), { seedPassword: "password123", demoPassword: DEMO }),
+    ).toThrow(expect.objectContaining({ message: expect.not.stringContaining("password123") }));
+  });
+});
+
+describe("base accounts seeder password", () => {
+  it("hashes SEED_PASSWORD, not the demo password, when it is set", async () => {
+    const bcrypt = require("bcryptjs");
+    const sequelize = new Sequelize("postgres://u@localhost:5432/x", { dialect: "postgres", logging: false });
+    const hashes = [];
+    sequelize.query = jest.fn(async (sql, options) => {
+      if (options?.replacements?.passwordHash) hashes.push(options.replacements.passwordHash);
+      if (/SELECT/.test(sql)) return [[{ id: "00000000-0000-0000-0000-000000000001" }]];
+      return [[]];
+    });
+    process.env.SEED_PASSWORD = "Kd9-vR4wQz-77-prod";
+    let seeder;
+    jest.isolateModules(() => {
+      seeder = require("../../seeders/20261105000200-base-accounts");
+    });
+    delete process.env.SEED_PASSWORD;
+
+    await seeder.up({ sequelize });
+
+    expect(hashes.length).toBeGreaterThan(0);
+    expect(await bcrypt.compare("Kd9-vR4wQz-77-prod", hashes[0])).toBe(true);
+    expect(await bcrypt.compare("Simpul-Demo-2026", hashes[0])).toBe(false);
+  });
 });

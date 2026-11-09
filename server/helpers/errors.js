@@ -11,6 +11,7 @@ const ERROR_CODES = Object.freeze({
   CONFLICT: "CONFLICT",
   INSUFFICIENT_STOCK: "INSUFFICIENT_STOCK",
   INTERNAL_ERROR: "INTERNAL_ERROR",
+  SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
 });
 
 // One status per code, so a controller never picks a status by hand.
@@ -26,6 +27,7 @@ const STATUS_BY_CODE = Object.freeze({
   CONFLICT: 409,
   INSUFFICIENT_STOCK: 409,
   INTERNAL_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
 });
 
 class AppError extends Error {
@@ -81,6 +83,13 @@ const insufficientStock = (productId) =>
 const internalError = () =>
   new AppError(ERROR_CODES.INTERNAL_ERROR, "Terjadi kesalahan pada server.");
 
+// The server is alive but cannot take the request now (for example the connection pool is full).
+const serviceUnavailable = () =>
+  new AppError(
+    ERROR_CODES.SERVICE_UNAVAILABLE,
+    "Server sedang sibuk. Coba lagi sebentar lagi.",
+  );
+
 module.exports = {
   AppError,
   ERROR_CODES,
@@ -96,4 +105,5 @@ module.exports = {
   conflict,
   insufficientStock,
   internalError,
+  serviceUnavailable,
 };
