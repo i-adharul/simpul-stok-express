@@ -24,7 +24,7 @@ Only the stock module is built. HR and POS modules are ideas, never scaffold the
 | Auth | JWT bearer in the `Authorization` header, `bcryptjs`, `jsonwebtoken`. Token kept in `localStorage` by the client |
 | Tests | Jest 30 and Supertest, real Postgres, `--runInBand` |
 | Client | React 19, Vite, Tailwind, daisyUI, axios, react-router, a small `AuthContext`. No Redux |
-| Deploy (end of M1) | API on EC2 (`pm2`, Nginx, HTTPS); client on Vercel |
+| Deploy | API on EC2 (`pm2`, Nginx, Let's Encrypt) at https://simpulstok-api.adharul.my.id; client on Vercel at https://simpulstok.adharul.my.id; database on Supabase. Live since M1 |
 
 Not used on purpose: Docker, CI, Redis, email sending, rate limiting, TypeScript, Redux, Playwright.
 
@@ -33,7 +33,7 @@ Not used on purpose: Docker, CI, Redis, email sending, rate limiting, TypeScript
 ```
 server/
   bin/www.js  app.js
-  config/        config.js (sequelize-cli, reads env), env.js (Zod-validated env)
+  config/        config.js (sequelize-cli, reads env), env.js (loads and validates env), envSchema.js (Zod schema, pure parseEnv)
   migrations/  models/  seeders/
   routes/        index.js + one file per resource
   controllers/   thin: read the request, call a service or tenant data access, reply
@@ -43,6 +43,7 @@ server/
                  subscriptionGuard, requestLogger, errorHandler
   helpers/       bcrypt, jwt, errors (AppError), tenantScope, ownership,
                  permissions, password, pagination, logger
+  scripts/       resetDemo.js (demo database reset), deploy.sh (pull, install, restart, health)
   __tests__/     support/ (DB reset, factories, endpoint registry)
 client/          views, layouts, components, constants, utils, context
 docs/            English docs and decisions/ (ADRs)
@@ -85,9 +86,11 @@ npx jest path/to/file.test.js        # one file
 npx jest -t "test name"              # one test
 npx sequelize db:migrate             # apply migrations (dev database)
 npx sequelize db:migrate:undo:all    # roll everything back
-npx sequelize db:seed:all            # base seed (refuses non-local databases)
+npx sequelize db:seed:all             # base seed (remote needs SEED_ALLOW_REMOTE=true and a strong SEED_PASSWORD; on production seed plans and base-accounts one by one with --seed)
+npm run demo:reset                    # restore the demo database (uses TRUNCATE; never on production)
 cd ../client && npm run dev          # Vite dev server
 cd ../client && npm run build
+# On the EC2 server, from the repo root: ./server/scripts/deploy.sh (pull, install, set COMMIT_SHA, restart pm2, health check)
 ```
 
 There is no CI. Run `npm test` before every push and put the real result in the PR description.
@@ -99,7 +102,7 @@ There is no CI. Run `npm test` before every push and put the real result in the 
 - Small commits: `E4-02: add receive service with transaction`. No AI attribution trailers (AI-assisted development is disclosed in the README).
 - PR title equals the issue title. Use `Closes #nn` when the PR finishes the story, `Refs #nn` when UI steps are still open. Squash merge. The maintainer merges, not the assistant.
 - Test first when a step has a business rule. Run the relevant tests before committing. A step that is intentionally red (E5-01, E5-02) says so in its commit message and walkthrough.
-- Decision records: the numbers 0001 to 0014 are reserved in `docs/decisions/README.md`. A step that says "tulis ADR 00NN" writes that record in English (status `proposed`, then `accepted` after the maintainer agrees).
+- Decision records: the numbers 0001 to 0014 are reserved in `docs/decisions/README.md`. A step that says "tulis ADR 00NN" writes that record in English (with `/step` the status is `proposed`, then `accepted` after the maintainer agrees; in `/story` and `/epic` the record is written as `accepted` and is accepted by merging its PR).
 - Public issues and PRs never contain personal career words (CV, job applications, interviews, bootcamp, vacancies).
 
 ## How to assist
