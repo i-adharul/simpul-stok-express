@@ -1,6 +1,6 @@
 const { UniqueConstraintError } = require("sequelize");
 const { hashPassword } = require("../helpers/bcrypt");
-const { conflict, internalError } = require("../helpers/errors");
+const { conflict, internalError, notFound } = require("../helpers/errors");
 const { signToken } = require("../helpers/jwt");
 const organizationAccess = require("../helpers/organizationAccess");
 const { inTransaction } = require("../helpers/transaction");
@@ -73,4 +73,22 @@ async function register({ organizationName, slug, name, email, password }) {
   };
 }
 
-module.exports = { register, TRIAL_DAYS, GRACE_DAYS };
+// The shape of docs/04. Only these fields leave the server.
+const publicOrganization = ({ id, name, slug, address, status, createdAt }) => ({
+  id,
+  name,
+  slug,
+  address,
+  status,
+  createdAt,
+});
+
+// The organization of the caller, found by ctx.organizationId (rule 1). A missing row would mean the
+// organization was removed while the user still exists: the same 404 as any missing data.
+async function getOrganization(ctx) {
+  const organization = await organizationAccess.findOrganization(ctx.organizationId);
+  if (!organization) throw notFound();
+  return publicOrganization(organization);
+}
+
+module.exports = { register, getOrganization, TRIAL_DAYS, GRACE_DAYS };
