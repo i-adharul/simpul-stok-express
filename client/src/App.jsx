@@ -6,6 +6,7 @@ import SessionExpiredModal from './components/SessionExpiredModal'
 import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 import Register from './views/Register'
+import AcceptInvite from './views/AcceptInvite'
 import Profile from './views/Profile'
 import OrganizationSettings from './views/OrganizationSettings'
 import Members from './views/Members'
@@ -32,6 +33,7 @@ function App() {
         <Routes>
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="invite/:token" element={<AcceptInvite />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<BaseLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
