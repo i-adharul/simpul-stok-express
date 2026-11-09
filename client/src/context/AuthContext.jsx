@@ -82,6 +82,11 @@ export function AuthProvider({ children }) {
     return data.redirectTo
   }, [])
 
+  // After S15 saves, the sidebar shows the new name without a reload: only the organization part changes.
+  const updateOrganization = useCallback((changes) => {
+    setSession((current) => ({ ...current, organization: current.organization ? { ...current.organization, ...changes } : current.organization }))
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await http.post('/api/auth/logout') // the server keeps no session; this call is only a courtesy
@@ -93,8 +98,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, logout }),
-    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, logout],
+    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, updateOrganization, logout }),
+    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, updateOrganization, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
