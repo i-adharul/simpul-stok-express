@@ -7,10 +7,16 @@ async function login(req, res) {
   res.status(200).json(result);
 }
 
+// Public: the token in the body is the proof. 200 like login, so the new member lands on the dashboard.
+async function acceptInvite(req, res) {
+  const result = await authService.acceptInvite(req.valid.body);
+  res.status(200).json(result);
+}
+
 // The server keeps no session, so there is nothing to revoke: the client deletes its token. The
 // answer does not depend on the token, so a client with an expired token can still "log out".
 function logout(req, res) {
   res.status(204).end();
 }
 
-module.exports = { login, logout };
+module.exports = { login, acceptInvite, logout };

@@ -3,7 +3,7 @@ const authController = require("../controllers/authController");
 const organizationController = require("../controllers/organizationController");
 const noStore = require("../middlewares/noStore");
 const validate = require("../middlewares/validate");
-const { loginSchema, registerOrganizationSchema } = require("../schemas/auth.schema");
+const { acceptInviteSchema, loginSchema, registerOrganizationSchema } = require("../schemas/auth.schema");
 
 const router = express.Router();
 
@@ -19,6 +19,10 @@ router.post(
   validate({ body: registerOrganizationSchema }),
   organizationController.registerOrganization,
 );
+
+// Public: the person has no account yet, the token in the body is the proof (BL06). No subscription
+// check: the invitation row says which organization it is, and the guard needs a session.
+router.post("/auth/accept-invite", validate({ body: acceptInviteSchema }), authController.acceptInvite);
 
 // Public and without a schema: it reads no input at all (allowed in the write-route static test).
 router.post("/auth/logout", authController.logout);

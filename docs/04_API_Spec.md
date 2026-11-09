@@ -74,6 +74,19 @@ One transaction creates the Organization (status `TRIAL`), the Owner and a Subsc
 | 400 | `VALIDATION_ERROR` (invalid field, unknown key, or a refused password with its reason in `message`) |
 | 409 | `CONFLICT` with `details: [{ "source": "body", "path": "email" \| "slug", "message" }]`: the email or slug is taken. The unique constraint decides, so two simultaneous sign-ups cannot both succeed |
 
+### `POST /api/auth/accept-invite`
+
+Public (the token in the body is the proof) and not subject to the subscription check. Body, all required and unknown keys rejected: `{ "token": string, "name": string (1-100), "password": string }`. The password rules of BL01 apply, and the password may not equal the invited email or the part before the `@`.
+
+In one transaction that locks the invitation row (`SELECT ... FOR UPDATE`) and judges it again, the server creates the user, replaces the warehouse assignment (only warehouses that are still active) and marks the invitation used. The email of an **inactive member of the same organization** reactivates that user with the new name, password, role and assignment; every token that user held earlier stops working. Of two simultaneous acceptances of one token exactly one succeeds.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }` |
+| 400 | `VALIDATION_ERROR` (shape, or the reason the password is refused in `message` with `details: [{ "source": "body", "path": "password", "message" }]`) |
+| 404 | `NOT_FOUND`, identical to `GET /api/invitations/:token`: the token is malformed, unknown, expired or already used |
+| 409 | `CONFLICT`: the email now belongs to an active user, to a user of another organization, or to an Owner |
+
 ### `POST /api/auth/logout`
 
 Any caller, with or without a token; no body. Always `204` with no body. The server keeps no session, so nothing is revoked on the server: the client deletes its token. A token stays valid until it expires or until the password changes.
