@@ -10,6 +10,8 @@ const { listRoutes, findUnguardedWriteRoutes } = require("./support/routeInspect
 const ALLOWED_WITHOUT_GUARD = [
   "POST /auth/login",
   "POST /auth/logout",
+  // BL04: a new customer has no organization yet, so there is no subscription to check.
+  "POST /auth/register-organization",
   "PATCH /me/password",
 ];
 

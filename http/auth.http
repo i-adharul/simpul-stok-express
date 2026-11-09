@@ -49,3 +49,30 @@ Authorization: Bearer {{login.response.body.token}}
 Content-Type: application/json
 
 { "currentPassword": "Simpul-Demo-2026", "newPassword": "Kopi-Susu-2027" }
+
+### Sign up a new organization (public, BL04)
+# Expect 201 {"token","user":{...,"role":"OWNER"},"organization":{...,"status":"TRIAL"},"redirectTo":"/dashboard"} and Cache-Control: no-store.
+# Needs the plans seed (Starter). Use the token on GET /api/me. A second call with the same email or slug gives 409 CONFLICT.
+POST http://localhost:3000/api/auth/register-organization
+Content-Type: application/json
+
+{
+  "organizationName": "Toko Maju",
+  "slug": "tokomaju",
+  "name": "Budi Santoso",
+  "email": "budi@tokomaju.example",
+  "password": "Gula-Kopi-2026"
+}
+
+### Invalid slug and weak password
+# Expect 400 VALIDATION_ERROR with details for "slug" and "password".
+POST http://localhost:3000/api/auth/register-organization
+Content-Type: application/json
+
+{
+  "organizationName": "Toko Maju",
+  "slug": "Toko-Maju",
+  "name": "Budi Santoso",
+  "email": "budi@tokomaju.example",
+  "password": "short"
+}

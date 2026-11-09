@@ -10,6 +10,7 @@ const EXEMPT_ROUTES = {};
 const PUBLIC_ROUTES = {
   "GET /health": "Health check: no session and no tenant data.",
   "POST /auth/login": "Before any session exists: the organization is not known yet.",
+  "POST /auth/register-organization": "Public sign-up: no organization exists yet, so there is no tenant data to read; the service creates the organization and never uses the tenant data access.",
   "POST /auth/logout": "Reads no input and no tenant data; always answers 204.",
   "GET /me": "Acts on the caller's own user only (from the token); no ID comes from the URL or the body.",
   "PATCH /me/password": "Acts on the caller's own user only (from the token); no ID comes from the URL or the body.",
