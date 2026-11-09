@@ -4,8 +4,9 @@ const { Organization, User, UserWarehouse, Warehouse } = require("../models");
 // are not tenant-scoped on purpose. Everything after login loads the user through the request
 // context instead. Keep this file small: every function here can see all tenants.
 
-// `email` must already be trimmed and lowercase (loginSchema does that).
-const findUserByEmail = (email) => User.findOne({ where: { email } });
+// `email` must already be trimmed and lowercase (loginSchema does that). `options` may carry a
+// `transaction` (and a `lock`) for the accept-invitation flow.
+const findUserByEmail = (email, options = {}) => User.findOne({ where: { email }, ...options });
 
 const touchLastLogin = (userId) =>
   User.update({ lastLoginAt: new Date() }, { where: { id: userId } });
