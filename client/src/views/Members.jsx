@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { ROLE_LABELS } from '../constants/navigation'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import InviteMemberModal from '../components/InviteMemberModal'
 import Pagination from '../components/Pagination'
 import { formatDateTime, timeRemaining } from '../utils/format'
+import { toast } from '../utils/toast'
 import { useActiveWarehouses } from '../utils/useActiveWarehouses'
 import { usePagedList } from '../utils/usePagedList'
 
@@ -103,15 +106,30 @@ function InvitationsTable({ list }) {
 export default function Members() {
   const members = usePagedList('/api/members')
   const invitations = usePagedList('/api/invitations')
-  const { warehouses } = useActiveWarehouses()
+  const { warehouses, error: warehousesError, retry: retryWarehouses } = useActiveWarehouses()
   const activeCount = warehouses?.total ?? 0
+  const [inviting, setInviting] = useState(false)
+
+  // 201: the invitation list reloads. The link popup (P08) is opened from here in the next step.
+  function handleCreated() {
+    setInviting(false)
+    toast.success('Undangan dibuat.')
+    invitations.reload()
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Anggota</h1>
-        <p className="text-sm text-base-content/70">Kelola izin hak akses dan penugasan lokasi gudang untuk operasional staf.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Anggota</h1>
+          <p className="text-sm text-base-content/70">Kelola izin hak akses dan penugasan lokasi gudang untuk operasional staf.</p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => setInviting(true)} disabled={!warehouses}>
+          Undang anggota
+        </button>
       </div>
+
+      {warehousesError && <ErrorState message="Daftar gudang tidak dapat dimuat." onRetry={retryWarehouses} />}
 
       <section className="space-y-3">
         <h2 className="font-bold">Anggota{members.data ? ` (${members.data.total})` : ''}</h2>
@@ -126,6 +144,7 @@ export default function Members() {
           <InvitationsTable list={invitations} />
         </ListState>
       </section>
+      {inviting && <InviteMemberModal warehouses={warehouses.items} onCreated={handleCreated} onClose={() => setInviting(false)} />}
     </div>
   )
 }
