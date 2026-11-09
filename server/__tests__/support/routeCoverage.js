@@ -1,15 +1,16 @@
 // Where is every Express route accounted for in the cross-tenant harness? (docs/06_Test_Plan.md)
-// A route must be in exactly one of: the registry, EXEMPT_ROUTES or PUBLIC_ROUTES. A registry or
+// A route must be in exactly one of: the registry, EXEMPT_ROUTES, PUBLIC_ROUTES or PLATFORM_ROUTES. A registry or
 // exemption label that matches no route is stale and is reported too.
 const { listRoutes } = require("./routeInspector");
 const { labelOf } = require("./registry");
 
-function placementProblems(app, { endpoints, exempt, publicRoutes }) {
+function placementProblems(app, { endpoints, exempt, publicRoutes, platformRoutes = {} }) {
   const routeLabels = new Set(listRoutes(app).map((route) => route.label));
   const places = {
     "TENANT_ENDPOINTS (registry.js)": endpoints.map(labelOf),
     "EXEMPT_ROUTES (exemptions.js)": Object.keys(exempt),
     "PUBLIC_ROUTES (exemptions.js)": Object.keys(publicRoutes),
+    "PLATFORM_ROUTES (exemptions.js)": Object.keys(platformRoutes),
   };
 
   const problems = [];
@@ -17,7 +18,7 @@ function placementProblems(app, { endpoints, exempt, publicRoutes }) {
     const where = Object.entries(places)
       .filter(([, labels]) => labels.includes(label))
       .map(([name]) => name);
-    if (where.length === 0) problems.push(`${label} is in none of the three places`);
+    if (where.length === 0) problems.push(`${label} is in none of the four places`);
     if (where.length > 1) problems.push(`${label} is in more than one place: ${where.join(", ")}`);
   }
   for (const [name, labels] of Object.entries(places)) {
