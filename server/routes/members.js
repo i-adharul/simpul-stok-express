@@ -2,8 +2,9 @@ const express = require("express");
 const memberController = require("../controllers/memberController");
 const authentication = require("../middlewares/authentication");
 const { requireCan } = require("../middlewares/authorization");
+const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { memberListQuerySchema } = require("../schemas/member.schema");
+const { memberListQuerySchema, updateMemberSchema } = require("../schemas/member.schema");
 
 const router = express.Router();
 
@@ -14,6 +15,17 @@ router.get(
   requireCan("member.manage"),
   validate({ query: memberListQuerySchema }),
   memberController.list,
+);
+
+// The ID is not validated here (a malformed ID is a 404 from findOwned, rule 2); only the body is. The
+// role is checked first (403 before anything else), then the subscription (rule 17), then validate.
+router.patch(
+  "/members/:id",
+  authentication,
+  requireCan("member.manage"),
+  subscriptionGuard,
+  validate({ body: updateMemberSchema }),
+  memberController.update,
 );
 
 module.exports = router;

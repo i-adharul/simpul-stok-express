@@ -7,3 +7,26 @@ Authorization: Bearer {{token}}
 ### Warehouse Admin or Viewer: 403 FORBIDDEN
 GET http://localhost:3000/api/members
 Authorization: Bearer {{token}}
+
+### Change a member's role and warehouses (Owner only). Use an "id" from GET /api/members.
+# Expect 200 with the updated member (same shape as a list row). The change applies on the member's next request.
+PATCH http://localhost:3000/api/members/00000000-0000-4000-8000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "role": "VIEWER", "warehouseIds": [] }
+
+### Deactivate a member (only false is accepted; the member's existing token gets 401 at once)
+PATCH http://localhost:3000/api/members/00000000-0000-4000-8000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "isActive": false }
+
+### The Owner cannot be changed
+# Expect 409 CONFLICT when the ID is the Owner's. The role OWNER in the body is 400.
+PATCH http://localhost:3000/api/members/00000000-0000-4000-8000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "role": "OWNER" }

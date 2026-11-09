@@ -1,6 +1,10 @@
 const { Op, literal } = require("sequelize");
+const { conflict, notFound } = require("../helpers/errors");
+const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
+const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
+const { lockWarehouse } = require("./warehouseLock");
 
 // Members of the organization (BL07). It knows nothing about HTTP: the controller passes the
 // request context and the validated query.
@@ -13,18 +17,20 @@ const OWNER_FIRST = literal(`CASE WHEN "User"."role" = 'OWNER' THEN 0 ELSE 1 END
 // Two scoped queries and no include, because tenantScope does not filter included models (ADR 0011):
 // each query carries the organization filter, so a link or warehouse of another organization can
 // never show up here. Returns a Map userId -> [{ id, code }] ordered by code.
-async function assignedWarehouses(ctx, userIds) {
+async function assignedWarehouses(ctx, userIds, options = {}) {
   const byUser = new Map(userIds.map((id) => [id, []]));
   if (userIds.length === 0) return byUser;
 
   const links = await tenant(ctx).UserWarehouse.findAll({
     where: { userId: { [Op.in]: userIds } },
     attributes: ["userId", "warehouseId"],
+    ...options,
   });
   const warehouses = await tenant(ctx).Warehouse.findAll({
     where: { id: { [Op.in]: [...new Set(links.map((link) => link.warehouseId))] }, archivedAt: null },
     attributes: ["id", "code"],
     order: [["code", "ASC"], ["id", "ASC"]],
+    ...options,
   });
 
   for (const warehouse of warehouses) {
@@ -65,4 +71,40 @@ async function list(ctx, query) {
   return pageBody(rows.map((row) => toMember(row, warehouses.get(row.id))), total, query);
 }
 
-module.exports = { list, toMember };
+// Replaces the assignment of the member as a whole (BL10): every wanted warehouse is locked in ID order
+// (the order every writer uses, ADR 0013) and read again UNDER the lock. A missing, foreign or archived
+// one is the same 404 (rule 2), so an archive that runs at the same moment either comes first (this
+// call gets 404 and writes nothing) or waits for this transaction (the assignment is then complete).
+async function replaceAssignment(ctx, userId, warehouseIds, transaction) {
+  for (const warehouseId of [...warehouseIds].sort()) {
+    const warehouse = await lockWarehouse(ctx, warehouseId, transaction);
+    if (!warehouse || warehouse.archivedAt) throw notFound();
+  }
+  const old = await tenant(ctx).UserWarehouse.findAll({ where: { userId }, transaction });
+  for (const row of old) await row.destroy({ transaction });
+  for (const warehouseId of warehouseIds) {
+    await tenant(ctx).UserWarehouse.create({ userId, warehouseId }, { transaction });
+  }
+}
+
+// BL07. The member is found like any row of the organization (a malformed, missing or foreign ID is
+// the same 404; a Platform admin has no organization, so it is never found) and the row is locked, so
+// two changes of one member run one after the other. The Owner is protected: every change to an Owner
+// is a 409, which also keeps the last Owner from being deactivated or demoted (there is exactly one).
+// Role and status are read from the database on every request, so the change applies on the next
+// request of that member without touching their token.
+function update(ctx, id, body) {
+  return inTransaction(async (transaction) => {
+    const target = await findOwned(ctx, "User", id, { transaction, lock: transaction.LOCK.UPDATE });
+    if (target.role === "OWNER") throw conflict("Pemilik tidak dapat diubah atau dinonaktifkan.");
+
+    const { warehouseIds, ...fields } = body;
+    if (Object.keys(fields).length > 0) await target.update(fields, { transaction });
+    if (warehouseIds) await replaceAssignment(ctx, target.id, warehouseIds, transaction);
+
+    const warehouses = await assignedWarehouses(ctx, [target.id], { transaction });
+    return toMember(target, warehouses.get(target.id));
+  });
+}
+
+module.exports = { list, update, toMember };
