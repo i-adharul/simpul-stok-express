@@ -1,6 +1,6 @@
 const { ACTIONS } = require("../helpers/permissions");
 const { TENANT_ENDPOINTS, labelOf, allowedRoles, validateEntry } = require("./support/registry");
-const { EXEMPT_ROUTES, PUBLIC_ROUTES } = require("./support/exemptions");
+const { EXEMPT_ROUTES, PUBLIC_ROUTES, PLATFORM_ROUTES } = require("./support/exemptions");
 
 const valid = (extra = {}) => ({
   method: "get",
@@ -54,7 +54,7 @@ describe("warehouse and product endpoints (E3)", () => {
 });
 
 describe("the exemption lists", () => {
-  it.each([["EXEMPT_ROUTES", EXEMPT_ROUTES], ["PUBLIC_ROUTES", PUBLIC_ROUTES]])(
+  it.each([["EXEMPT_ROUTES", EXEMPT_ROUTES], ["PUBLIC_ROUTES", PUBLIC_ROUTES], ["PLATFORM_ROUTES", PLATFORM_ROUTES]])(
     "%s: every label has a written reason",
     (_name, list) => {
       for (const [label, reason] of Object.entries(list)) {
@@ -65,10 +65,15 @@ describe("the exemption lists", () => {
     },
   );
 
-  it("never lists the same route in both", () => {
-    const both = Object.keys(EXEMPT_ROUTES).filter((label) => label in PUBLIC_ROUTES);
+  it("never lists the same route in two lists", () => {
+    const lists = [EXEMPT_ROUTES, PUBLIC_ROUTES, PLATFORM_ROUTES];
+    const labels = lists.flatMap((list) => Object.keys(list));
 
-    expect(both).toEqual([]);
+    expect(labels.filter((label, index) => labels.indexOf(label) !== index)).toEqual([]);
+  });
+
+  it("PLATFORM_ROUTES holds only paths under /platform", () => {
+    for (const label of Object.keys(PLATFORM_ROUTES)) expect(label).toMatch(/^[A-Z]+ \/platform\//);
   });
 });
 

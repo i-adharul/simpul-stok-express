@@ -1,5 +1,5 @@
 // Routes the cross-tenant harness does not attack, each with a written reason. A route must be in
-// exactly one of: TENANT_ENDPOINTS (registry.js), EXEMPT_ROUTES, PUBLIC_ROUTES. Labels are
+// exactly one of: TENANT_ENDPOINTS (registry.js), EXEMPT_ROUTES, PUBLIC_ROUTES, PLATFORM_ROUTES. Labels are
 // "<METHOD> <path as declared in the router>". Keep these short and keep the reasons honest.
 
 // A tenant route that cannot be tested the normal way (it has no ID the harness can swap for another
@@ -22,4 +22,11 @@ const PUBLIC_ROUTES = {
   "PATCH /me/password": "Acts on the caller's own user only (from the token); no ID comes from the URL or the body.",
 };
 
-module.exports = { EXEMPT_ROUTES, PUBLIC_ROUTES };
+// Platform admin routes (/api/platform/*): they read across tenants on purpose through
+// helpers/platformAccess.js, so the harness cannot swap an organization's ID for a foreign one.
+// Their rule is the opposite one: only a Platform admin may call them, a tenant role gets 403 and no
+// token gets 401 (proven for every label by platformRoutes.test.js). Empty until E11-03 adds the
+// first one; each label needs a written reason, like the other lists.
+const PLATFORM_ROUTES = {};
+
+module.exports = { EXEMPT_ROUTES, PUBLIC_ROUTES, PLATFORM_ROUTES };
