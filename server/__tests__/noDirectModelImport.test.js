@@ -12,6 +12,15 @@ const CHECKED_DIRS = ["controllers", "services"];
 //   "services/warehouseLock.js": "needs sequelize.transaction and the SELECT ... FOR UPDATE lock"
 const EXCEPTIONS = {};
 
+// helpers/platformAccess.js is the only cross-tenant read gate (no organizationId filter). It lives
+// in helpers/, which this scan does not cover, so it is listed here with its reason and checked
+// by its own tests below: it may be required only by the Platform admin code.
+const PLATFORM_GATE = {
+  file: "helpers/platformAccess.js",
+  reason: "reads organizations across tenants for the Platform admin routes; it is the only such gate",
+  allowedCallers: ["routes/platform.js", "controllers/platformController.js", "services/platformService.js"],
+};
+
 // require("../models"), require("../models/user"), require("../models/index.js") and the import form.
 const MODEL_IMPORT = /(?:require\(\s*|from\s+|import\s+)["'`](?:\.\.?\/)+models(?:\/[^"'`]*)?["'`]/;
 
@@ -50,6 +59,36 @@ describe("rule 3: controllers and services do not import models directly", () =>
       expect(fs.existsSync(path.join(SERVER, label))).toBe(true);
       expect(reason.trim().length).toBeGreaterThan(10);
     }
+  });
+});
+
+describe("helpers/platformAccess.js is the only cross-tenant read gate", () => {
+  const callers = () =>
+    ["controllers", "services", "routes", "middlewares", "helpers"].flatMap((folder) =>
+      fs
+        .readdirSync(path.join(SERVER, folder))
+        .filter((name) => name.endsWith(".js"))
+        .map((name) => `${folder}/${name}`)
+        .filter((label) => label !== PLATFORM_GATE.file)
+        .filter((label) => /platformAccess/.test(fs.readFileSync(path.join(SERVER, label), "utf8"))),
+    );
+
+  it("exists and has a written reason", () => {
+    expect(fs.existsSync(path.join(SERVER, PLATFORM_GATE.file))).toBe(true);
+    expect(PLATFORM_GATE.reason.trim().length).toBeGreaterThan(10);
+  });
+
+  it("is required only by the Platform admin code", () => {
+    const outside = callers().filter((label) => !PLATFORM_GATE.allowedCallers.includes(label));
+
+    expect(outside).toEqual([]);
+  });
+
+  it("has no organizationId filter on the tenant tables it does not need (only Organization is imported)", () => {
+    const source = fs.readFileSync(path.join(SERVER, PLATFORM_GATE.file), "utf8");
+
+    expect(source).toMatch(/require\("\.\.\/models"\)/);
+    expect(source).toMatch(/const \{ Organization \} = /);
   });
 });
 
