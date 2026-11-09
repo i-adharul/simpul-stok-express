@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import FormField from '../components/FormField'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { ROLE_LABELS } from '../constants/navigation'
-import { PASSWORD_HINT, validateAccept } from '../utils/registerForm'
+import { useAuth } from '../context/authContext'
+import { GENERIC_ERROR, errorText, fieldErrorsFrom } from '../utils/apiError'
 import http from '../utils/http'
+import { PASSWORD_HINT, validateAccept } from '../utils/registerForm'
 
 function BrandHeader() {
   return (
@@ -17,15 +19,20 @@ function BrandHeader() {
 }
 
 // S03, the form: the email is read-only (it comes from the invitation), the rest is typed here.
-function AcceptForm({ invitation, values, errors, onChange, onSubmit }) {
+function AcceptForm({ invitation, values, errors, formError, submitting, onChange, onSubmit }) {
   return (
     <form className="mt-6 space-y-5" noValidate onSubmit={onSubmit}>
       <FormField id="email" label="Email terdaftar" readOnly value={invitation.email} hint="Dari undangan." />
       <FormField id="name" label="Nama lengkap" required maxLength={100} autoComplete="name" value={values.name} onChange={(e) => onChange('name', e.target.value)} error={errors.name} />
       <FormField id="password" label="Password baru" required type="password" maxLength={128} autoComplete="new-password" hint={PASSWORD_HINT} value={values.password} onChange={(e) => onChange('password', e.target.value)} error={errors.password} />
       <FormField id="passwordConfirm" label="Konfirmasi password" required type="password" maxLength={128} autoComplete="new-password" value={values.passwordConfirm} onChange={(e) => onChange('passwordConfirm', e.target.value)} error={errors.passwordConfirm} />
-      <button type="submit" className="btn btn-primary w-full">
-        Terima undangan
+      {formError && (
+        <p role="alert" className="text-sm font-medium text-error">
+          {formError}
+        </p>
+      )}
+      <button type="submit" className="btn btn-primary w-full" disabled={submitting}>
+        {submitting ? <span className="loading loading-spinner loading-sm" /> : 'Terima undangan'}
       </button>
     </form>
   )
@@ -34,6 +41,10 @@ function AcceptForm({ invitation, values, errors, onChange, onSubmit }) {
 // S03. Public route; the token in the URL is the proof. GET /api/invitations/:token tells who is invited.
 export default function AcceptInvite() {
   const { token } = useParams()
+  const { acceptInvite } = useAuth()
+  const navigate = useNavigate()
+  const [formError, setFormError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const [invitation, setInvitation] = useState(null)
   const [values, setValues] = useState({ name: '', password: '', passwordConfirm: '' })
   const [errors, setErrors] = useState({})
@@ -56,9 +67,28 @@ export default function AcceptInvite() {
     setErrors((current) => ({ ...current, [name]: undefined }))
   }
 
-  function handleSubmit(event) {
+  // 400 names the field (the password reason); 409 and 403 (plan limit) carry a message for the whole form.
+  function showServerError(error) {
+    const fields = fieldErrorsFrom(error)
+    setErrors(fields)
+    if (Object.keys(fields).length === 0) setFormError(errorText(error) ?? GENERIC_ERROR)
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault()
-    setErrors(validateAccept(values))
+    if (submitting) return
+    const found = validateAccept(values)
+    setErrors(found)
+    setFormError(null)
+    if (Object.keys(found).length > 0) return
+    setSubmitting(true)
+    try {
+      const redirectTo = await acceptInvite({ token, name: values.name.trim(), password: values.password })
+      navigate(redirectTo, { replace: true })
+    } catch (error) {
+      showServerError(error)
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -72,7 +102,7 @@ export default function AcceptInvite() {
             <p className="mt-1 text-sm text-base-content/70">
               Peran: <strong>{ROLE_LABELS[invitation.role] ?? invitation.role}</strong>. Lengkapi data akun di bawah ini.
             </p>
-            <AcceptForm invitation={invitation} values={values} errors={errors} onChange={handleChange} onSubmit={handleSubmit} />
+            <AcceptForm invitation={invitation} values={values} errors={errors} formError={formError} submitting={submitting} onChange={handleChange} onSubmit={handleSubmit} />
           </>
         )}
       </div>
