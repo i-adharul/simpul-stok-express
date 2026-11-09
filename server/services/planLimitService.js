@@ -1,4 +1,4 @@
-const { internalError } = require("../helpers/errors");
+const { internalError, planLimitReached } = require("../helpers/errors");
 const organizationAccess = require("../helpers/organizationAccess");
 const { tenant } = require("../helpers/tenantScope");
 
@@ -46,4 +46,32 @@ async function getPlanLimits(organizationId, options = {}) {
 // unpaid downgrade request exists (BL20), and every caller already goes through here.
 const getEffectiveLimits = (organizationId, options = {}) => getPlanLimits(organizationId, options);
 
-module.exports = { RESOURCES, getUsage, getPlanLimits, getEffectiveLimits };
+const LABEL = Object.freeze({ WAREHOUSE: "gudang", PRODUCT: "produk", MEMBER: "anggota" });
+
+// Refuses ONE more WAREHOUSE, PRODUCT or MEMBER when the organization already uses its whole limit:
+// used >= limit means the addition would exceed it. 403 PLAN_LIMIT_REACHED with
+// `details: { resource, limit, used }` and an Indonesian message. Must run inside the caller's
+// transaction, and the caller writes in that same transaction right after: usage is only meaningful
+// while nobody else can add in between (the organization lock, below). Pending invitations are not
+// counted; they are checked again when accepted.
+async function assertWithinLimit(organizationId, resource, { transaction } = {}) {
+  if (!transaction) throw new Error("assertWithinLimit must run inside a transaction");
+  if (!RESOURCES.includes(resource)) throw new Error(`Unknown plan resource: ${resource}`);
+
+  const options = { transaction };
+  const [usage, limits] = await Promise.all([
+    getUsage(organizationId, options),
+    getEffectiveLimits(organizationId, options),
+  ]);
+  const used = usage[resource];
+  const limit = limits[resource];
+  if (used >= limit) {
+    throw planLimitReached(`Batas ${LABEL[resource]} pada paket Anda sudah tercapai (${used} dari ${limit}).`, {
+      resource,
+      limit,
+      used,
+    });
+  }
+}
+
+module.exports = { RESOURCES, getUsage, getPlanLimits, getEffectiveLimits, assertWithinLimit };
