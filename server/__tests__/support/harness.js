@@ -181,7 +181,10 @@ async function checkOrganizationIdInput(app, entry, world) {
   if (own && !sameJson(await entry.readRow(own.id), ownBefore) && res.status === 400) {
     failures.push(fail(entry, "a rejected request still changed A's row"));
   }
-  if (own && (await entry.readRow(own.id))?.organizationId !== ownBefore?.organizationId) {
+  // A row that no longer exists (a DELETE endpoint removed it) was not moved to B: only a row that is
+  // still there with another organization counts.
+  const ownAfter = own ? await entry.readRow(own.id) : null;
+  if (own && ownAfter && ownAfter.organizationId !== ownBefore?.organizationId) {
     failures.push(fail(entry, "organizationId in the body moved A's row to B"));
   }
   return failures;

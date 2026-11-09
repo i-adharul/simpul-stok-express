@@ -97,6 +97,28 @@ const transfer = {
   readRow: rawRow("StockTransfers"),
 };
 
+// A pending invitation written by raw SQL (random hash and email, created by the organization's Owner).
+const invitation = {
+  createRow: async (world, organization) => {
+    const random = Math.random().toString(36).slice(2, 12);
+    const [rows] = await getSequelize().query(
+      `INSERT INTO "Invitations" ("organizationId", "email", "role", "tokenHash", "expiresAt", "createdById")
+       VALUES (:organizationId, :email, 'VIEWER', :tokenHash, now() + interval '7 days', :createdById) RETURNING "id"`,
+      {
+        replacements: {
+          organizationId: world.organizations[organization],
+          email: `invited-${random}@example.com`,
+          tokenHash: `hash-${random}`,
+          createdById: world.users[organization].OWNER.id,
+        },
+      },
+    );
+    return { id: rows[0].id };
+  },
+  readRow: rawRow("Invitations"),
+  countRows: rawCount("Invitations"),
+};
+
 // A stock write needs a warehouse and a product of the caller's organization that exist first.
 const stockBody = async (world, patch = {}) => ({
   warehouseId: await world.createWarehouse("A"),
@@ -306,6 +328,31 @@ const TENANT_ENDPOINTS = [
   // warehouse must appear and B's never (checkList).
   { method: "get", path: "/api/stock/transfers/destinations", kind: "list", action: "transfer.destinations", ...warehouse },
   { method: "get", path: "/api/stock/transfers/:id", kind: "item", action: "history.read", ...transfer },
+  // Invitations (E7-04). The harness cannot see the token, only the rows: A's list must never show
+  // B's invitation, B's invitation cannot be cancelled by A, and a warehouse of B in the body is
+  // answered exactly like a random UUID (404).
+  { method: "get", path: "/api/invitations", kind: "list", action: "member.manage", listQuery: { pageSize: 100 }, ...invitation },
+  {
+    method: "post",
+    path: "/api/invitations",
+    kind: "create",
+    action: "member.manage",
+    // A new email every time: the same body twice would be a 409, not a valid request.
+    body: () => ({ email: `new-${Math.random().toString(36).slice(2, 12)}@example.com`, role: "VIEWER", warehouseIds: [] }),
+    foreignBodies: [
+      {
+        key: "warehouseIds",
+        createForeign: async (world) => ({ id: await world.createWarehouse("B") }),
+        body: (world, id) => ({
+          email: `new-${Math.random().toString(36).slice(2, 12)}@example.com`,
+          role: "VIEWER",
+          warehouseIds: [id],
+        }),
+      },
+    ],
+    ...invitation,
+  },
+  { method: "delete", path: "/api/invitations/:id", kind: "item", action: "member.manage", ...invitation },
   { method: "get", path: "/api/products", kind: "list", action: "product.read", listQuery: { pageSize: 100 }, ...product },
   { method: "get", path: "/api/products/:id", kind: "item", action: "product.read", ...product },
   {

@@ -1,0 +1,34 @@
+### Invite a member (Owner only). First log in with http/auth.http and paste the token.
+# Expect 201 {"invitation":{"id","email","role","warehouseIds","expiresAt","status":"PENDING"},"token"} and Cache-Control: no-store.
+# This is the only response that holds the raw token. Link to give: <client>/invite/<token>.
+POST http://localhost:3000/api/invitations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "email": "sari@example.com", "role": "VIEWER", "warehouseIds": [] }
+
+### Role OWNER is refused
+# Expect 400 VALIDATION_ERROR with details [{ "source": "body", "path": "role", ... }]
+POST http://localhost:3000/api/invitations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "email": "sari@example.com", "role": "OWNER" }
+
+### Same email again while the first invitation is pending
+# Expect 409 CONFLICT with details [{ "source": "body", "path": "email", ... }]
+POST http://localhost:3000/api/invitations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "email": "sari@example.com", "role": "VIEWER" }
+
+### List pending and expired invitations (Owner only)
+# Expect 200 {"items":[...],"total","page","pageSize"}; items never hold a token or tokenHash.
+GET http://localhost:3000/api/invitations?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Cancel an invitation (use an "id" from the list)
+# Expect 204. An accepted, foreign, unknown or malformed ID gives an identical 404.
+DELETE http://localhost:3000/api/invitations/00000000-0000-4000-8000-000000000000
+Authorization: Bearer {{token}}
