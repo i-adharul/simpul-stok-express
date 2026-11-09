@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import BaseLayout from './layouts/BaseLayout'
+import PlatformLayout from './layouts/PlatformLayout'
+import PlatformOrganizations from './views/PlatformOrganizations'
 import ProtectedRoute from './components/ProtectedRoute'
 import RoleRoute from './components/RoleRoute'
 import SessionExpiredModal from './components/SessionExpiredModal'
@@ -34,6 +36,11 @@ function App() {
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           <Route path="invite/:token" element={<AcceptInvite />} />
+          <Route path="platform" element={<PlatformLayout />}>
+            <Route index element={<Navigate to="/platform/organizations" replace />} />
+            <Route path="organizations" element={<PlatformOrganizations />} />
+            <Route path="*" element={<Navigate to="/platform/organizations" replace />} />
+          </Route>
           <Route element={<ProtectedRoute />}>
             <Route element={<BaseLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
