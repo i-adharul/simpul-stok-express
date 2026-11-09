@@ -3,6 +3,7 @@ const { conflict, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
+const { assertWithinLimit, lockOrganization } = require("./planLimitService");
 const { lockWarehouse } = require("./warehouseLock");
 
 // Business rules of the warehouse (BL08). It knows nothing about HTTP: the controller passes the
@@ -15,8 +16,17 @@ function rethrowDuplicateCode(err) {
   throw err;
 }
 
-// organizationId is added by the tenant-scoped create from the context, never from the body.
-const createWarehouse = (ctx, values) => tenant(ctx).Warehouse.create(values).catch(rethrowDuplicateCode);
+// BL20. One transaction: the organization row is locked FIRST (lock order: organization, then
+// warehouses by ID), the plan limit is checked, and only then is the row written, so two simultaneous
+// creates at the last slot cannot both pass. organizationId is added by the tenant-scoped create from
+// the context, never from the body.
+function createWarehouse(ctx, values) {
+  return inTransaction(async (transaction) => {
+    await lockOrganization(ctx.organizationId, transaction);
+    await assertWithinLimit(ctx.organizationId, "WAREHOUSE", { transaction });
+    return tenant(ctx).Warehouse.create(values, { transaction }).catch(rethrowDuplicateCode);
+  });
+}
 
 // A warehouse may only be archived when every stock row of it is 0 (BL08). Runs inside the
 // transaction that holds the warehouse lock, so no stock can arrive between this check and the
@@ -38,9 +48,16 @@ async function updateWarehouse(ctx, id, body) {
   const found = await findOwned(ctx, "Warehouse", id);
 
   return inTransaction(async (transaction) => {
+    // A restore adds an active warehouse again, so it is checked like a create (BL20, P03): the
+    // organization lock comes BEFORE the warehouse lock, the same order as everywhere else.
+    if (archived === false) await lockOrganization(ctx.organizationId, transaction);
     const warehouse = await lockWarehouse(ctx, found.id, transaction);
     if (!warehouse || (warehouse.archivedAt && archived !== false)) throw notFound();
     if (archived === true) await assertNoStock(ctx, warehouse.id, transaction);
+    // Judged on the row under the lock: only a warehouse that is archived right now is being restored.
+    if (archived === false && warehouse.archivedAt) {
+      await assertWithinLimit(ctx.organizationId, "WAREHOUSE", { transaction });
+    }
 
     const values = { ...fields };
     if (archived !== undefined) values.archivedAt = archived ? new Date() : null;

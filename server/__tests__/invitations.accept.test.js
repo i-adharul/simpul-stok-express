@@ -11,7 +11,7 @@ const { getSequelize } = require("./support/db");
 const { clearTables } = require("./support/clearTables");
 const { createAccount, readUser } = require("./support/accounts");
 const { runConcurrently } = require("./support/concurrency");
-const { createOrganization, createWarehouse, assignWarehouse } = require("./support/factories");
+const { createOrganization, createWarehouse, assignWarehouse, giveRoomyPlan } = require("./support/factories");
 
 jest.setTimeout(60000);
 
@@ -51,6 +51,7 @@ beforeEach(async () => {
   await clearTables(getSequelize());
   orgA = await createOrganization("tokoa");
   orgB = await createOrganization("tokob");
+  await giveRoomyPlan(orgA, orgB);
   owner = await createAccount({ email: "owner-a@example.com", role: "OWNER", organizationId: orgA });
 });
 afterAll(async () => {

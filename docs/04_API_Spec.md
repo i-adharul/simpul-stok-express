@@ -84,6 +84,7 @@ In one transaction that locks the invitation row (`SELECT ... FOR UPDATE`) and j
 | ------ | ---- |
 | 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }` |
 | 400 | `VALIDATION_ERROR` (shape, or the reason the password is refused in `message` with `details: [{ "source": "body", "path": "password", "message" }]`) |
+| 403 | `PLAN_LIMIT_REACHED` (BL20): the member limit is checked again inside the transaction, under the organization lock, for a new member and for a reactivated one; the invitation stays usable. `details: { "resource": "MEMBER", "limit", "used" }`; nothing is written |
 | 404 | `NOT_FOUND`, identical to `GET /api/invitations/:token`: the token is malformed, unknown, expired or already used |
 | 409 | `CONFLICT`: the email now belongs to an active user, to a user of another organization, or to an Owner |
 
@@ -123,7 +124,7 @@ Every error body is `{ code, message, details }` (BL29), with no stack trace. `m
 | `UNAUTHENTICATED`          | 401    | No valid token.                                                                                                                                                             |
 | `INVALID_CREDENTIALS`      | 401    | `POST /api/auth/login` only: wrong email or password.                                                                                                                         |
 | `FORBIDDEN`                | 403    | The role may not do this, the warehouse is outside the caller's reach, or the caller is a platform admin on a tenant endpoint.                                                |
-| `PLAN_LIMIT_REACHED`       | 403    | Defined for plan limits; no endpoint returns it yet (E8).                                                                                                                     |
+| `PLAN_LIMIT_REACHED`       | 403    | Creating or restoring a warehouse or product, inviting a member, or accepting an invitation would exceed the plan limit (BL20). `details: { "resource": "WAREHOUSE" \| "PRODUCT" \| "MEMBER", "limit", "used" }`. |
 | `SUBSCRIPTION_READ_ONLY`   | 403    | Defined for a read-only subscription; no endpoint returns it yet (E8).                                                                                                        |
 | `NOT_FOUND`                | 404    | Missing, or belongs to another organization (one identical body, rule 2).                                                                                                     |
 | `CONFLICT`                 | 409    | The request is valid but the current state refuses it (duplicate code or SKU, archived target, stock still present, quantity limit).                                          |
@@ -162,7 +163,7 @@ Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100
 
 | Status | Body |
 | ------ | ---- |
-| 200 | `{ "items": [{ "id", "name", "email", "role", "isActive", "lastLoginAt", "allWarehouses", "warehouses": [{ "id", "code" }] }], "total", "page", "pageSize" }`. `warehouses` holds the assigned active warehouses (ordered by code); an Owner has `allWarehouses: true` and an empty list. No password hash and no reset columns |
+| 200 | `{ "items": [{ "id", "name", "email", "role", "isActive", "lastLoginAt", "allWarehouses", "warehouses": [{ "id", "code" }] }], "total", "page", "pageSize", "usage": { "used", "limit" } }`. `usage` is the member indicator (BL20): active users (the Owner included, inactive members and pending invitations not) against the effective member limit. `warehouses` holds the assigned active warehouses (ordered by code); an Owner has `allWarehouses: true` and an empty list. No password hash and no reset columns |
 
 ### `PATCH /api/members/:id`
 
@@ -185,6 +186,7 @@ Owner only (`member.manage`; other roles get `403` before the body is read). Bod
 | ------ | ---- |
 | 201 | `{ "invitation": { "id", "email", "role", "warehouseIds", "expiresAt", "status": "PENDING" }, "token" }`. This is the only response that ever holds the raw token; no response holds `tokenHash` |
 | 400 | `VALIDATION_ERROR` |
+| 403 | `PLAN_LIMIT_REACHED` (BL20): the organization already has as many active users as its plan allows (pending invitations are not counted; the limit is checked again at acceptance). `details: { "resource": "MEMBER", "limit", "used" }`; nothing is written |
 | 404 | `NOT_FOUND`: a warehouse that is missing, archived or of another organization (one identical answer) |
 | 409 | `CONFLICT` with `details: [{ "source": "body", "path": "email", "message" }]`: the email belongs to an active user, or to a user of another organization, or already has a pending invitation in this organization. The email of an inactive member of the same organization may be invited again. A pending invitation of another organization is not read here; that clash is refused when the invitation is accepted |
 
@@ -234,6 +236,7 @@ Owner only (`warehouse.manage`). Body (unknown fields, including `organizationId
 | 201    | The created warehouse, same shape as an item of the list above                  |
 | 400    | `VALIDATION_ERROR`: wrong shape, a field out of range, or an unknown field      |
 | 403    | `FORBIDDEN`: not the Owner                                                      |
+| 403    | `PLAN_LIMIT_REACHED` (BL20): the organization already uses all the warehouses of its plan. `details: { "resource": "WAREHOUSE", "limit", "used" }`; nothing is written |
 | 409    | `CONFLICT`: "Kode gudang sudah dipakai." (the code exists in this organization) |
 
 ### `PATCH /api/warehouses/:id`
@@ -245,6 +248,7 @@ Owner only (`warehouse.manage`). Body (strict, at least one field): `code`, `nam
 | 200    | The updated warehouse                                                                                             |
 | 400    | `VALIDATION_ERROR`: no field given, wrong shape, or an unknown field                                              |
 | 403    | `FORBIDDEN`: not the Owner                                                                                        |
+| 403    | `PLAN_LIMIT_REACHED` (BL20): restoring (`archived: false`) an archived warehouse would exceed the plan limit, as a create would. `details: { "resource": "WAREHOUSE", "limit", "used" }`; nothing is written |
 | 404    | `NOT_FOUND`: missing or foreign. An archived warehouse is found only when restoring (`archived: false`).          |
 | 409    | `CONFLICT`: the code exists, or "Gudang masih memiliki stok. Kosongkan stok sebelum mengarsipkan." when archiving |
 
@@ -268,6 +272,7 @@ Owner only (`product.manage`). Body (strict): `sku` (whitespace removed, stored 
 | 201    | The created product, same shape as an item of the list above |
 | 400    | `VALIDATION_ERROR`                                           |
 | 403    | `FORBIDDEN`: not the Owner                                   |
+| 403    | `PLAN_LIMIT_REACHED` (BL20): the organization already uses all the products of its plan. `details: { "resource": "PRODUCT", "limit", "used" }`; nothing is written |
 | 409    | `CONFLICT`: "SKU sudah dipakai."                             |
 
 ### `GET /api/products/:id`
@@ -288,6 +293,7 @@ Owner only (`product.manage`). Body (strict, at least one field): `sku`, `name`,
 | 200    | The updated product                                                   |
 | 400    | `VALIDATION_ERROR`: no field given, wrong shape, or an unknown field  |
 | 403    | `FORBIDDEN`: not the Owner                                            |
+| 403    | `PLAN_LIMIT_REACHED` (BL20): restoring an archived product would exceed the plan limit. `details: { "resource": "PRODUCT", "limit", "used" }`; nothing is written |
 | 404    | `NOT_FOUND`: missing or foreign (an archived one only when restoring) |
 | 409    | `CONFLICT`: "SKU sudah dipakai."                                      |
 
