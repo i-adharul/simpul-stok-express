@@ -164,6 +164,19 @@ Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100
 | ------ | ---- |
 | 200 | `{ "items": [{ "id", "name", "email", "role", "isActive", "lastLoginAt", "allWarehouses", "warehouses": [{ "id", "code" }] }], "total", "page", "pageSize" }`. `warehouses` holds the assigned active warehouses (ordered by code); an Owner has `allWarehouses: true` and an empty list. No password hash and no reset columns |
 
+### `PATCH /api/members/:id`
+
+Owner only (`member.manage`; other roles get `403` before the ID or body is looked at). Body (strict, at least one field): `role` (`WAREHOUSE_ADMIN` or `VIEWER`; `OWNER` is `400`), `isActive` (only `false`; `true` is `400`, reactivation goes through a new invitation) and `warehouseIds` (UUIDs, no duplicates, at most 200: the **whole** new assignment, replaced in one transaction). The member row and every involved warehouse are locked (warehouses in ID order), so a change and an archive at the same moment never leave an assignment on a warehouse archived first.
+
+The change applies on the member's next request, because role and status are read from the database on every request: a deactivated member's existing token gets `401`, and a member whose role changed is judged by the new role.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | The updated member, in the shape of one row of `GET /api/members` |
+| 400 | `VALIDATION_ERROR` |
+| 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin; or a warehouse in `warehouseIds` is missing, archived or of another organization (identical answers) |
+| 409 | `CONFLICT`: the target is the Owner (every change to an Owner is refused, so the last Owner can never be deactivated or demoted) |
+
 ### `POST /api/invitations`
 
 Owner only (`member.manage`; other roles get `403` before the body is read). Body (strict): `email` (valid, trimmed, stored lowercase), `role` (`WAREHOUSE_ADMIN` or `VIEWER`; `OWNER` is `400`) and `warehouseIds` (UUIDs, no duplicates, at most 200, may be empty or left out).
