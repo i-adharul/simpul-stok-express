@@ -9,6 +9,7 @@ import Dashboard from './views/Dashboard'
 import Login from './views/Login'
 import Register from './views/Register'
 import AcceptInvite from './views/AcceptInvite'
+import ResetPassword from './views/ResetPassword'
 import Profile from './views/Profile'
 import OrganizationSettings from './views/OrganizationSettings'
 import Members from './views/Members'
@@ -36,6 +37,7 @@ function App() {
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           <Route path="invite/:token" element={<AcceptInvite />} />
+          <Route path="reset/:token" element={<ResetPassword />} />
           <Route path="platform" element={<PlatformLayout />}>
             <Route index element={<Navigate to="/platform/organizations" replace />} />
             <Route path="organizations" element={<PlatformOrganizations />} />
