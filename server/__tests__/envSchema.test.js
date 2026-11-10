@@ -202,3 +202,24 @@ describe("parseEnv demo mode", () => {
     expect(() => parseEnv({ ...demo, DEMO_VIEWER_EMAIL: "OWNER@example.com" })).toThrow(/must be different/);
   });
 });
+
+describe("parseEnv: demo reset settings (ADR 0017)", () => {
+  it("leaves the reset connection empty and the wipe switch off by default", () => {
+    const env = parseEnv(valid);
+
+    expect(env.DEMO_RESET_DATABASE_URL).toBeNull();
+    expect(env.DEMO_RESET_WIPE_OTHERS).toBe(false);
+  });
+
+  it("reads the reset connection and the wipe switch", () => {
+    const env = parseEnv({ ...valid, DEMO_RESET_DATABASE_URL: "postgres://simpul_reset@localhost:5432/simpul_dev", DEMO_RESET_WIPE_OTHERS: "true" });
+
+    expect(env.DEMO_RESET_DATABASE_URL).toBe("postgres://simpul_reset@localhost:5432/simpul_dev");
+    expect(env.DEMO_RESET_WIPE_OTHERS).toBe(true);
+  });
+
+  it("refuses a wipe switch that is not true or false, and a reset URL that is not postgres", () => {
+    expect(() => parseEnv({ ...valid, DEMO_RESET_WIPE_OTHERS: "yes" })).toThrow("DEMO_RESET_WIPE_OTHERS");
+    expect(() => parseEnv({ ...valid, DEMO_RESET_DATABASE_URL: "http://example.com" })).toThrow("DEMO_RESET_DATABASE_URL");
+  });
+});

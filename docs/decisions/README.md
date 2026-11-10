@@ -21,6 +21,7 @@ The numbers below are reserved from the start so that other documents can refer 
 | 0013 | Warehouse row lock as the serialization point for stock writes                           | accepted | E4-02 |
 | 0014 | Transfer code without a shared row, and two-warehouse locking for transfers              | accepted | E5-03 |
 | 0016 | Demo access model (configured demo accounts, one public endpoint, a normal token)        | accepted | E15-01 |
+| 0017 | Daily demo reset on production (separate role, separate connection, explicit switch)     | accepted | E15-04 |
 
 ## Format
 

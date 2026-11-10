@@ -3,6 +3,8 @@
 // already set, so pinning these first (before config/env.js loads) wins over a DEMO_* value in .env.
 // A test that needs demo mode turns it on itself (it mocks config/env).
 process.env.DEMO_MODE = "false";
+process.env.DEMO_RESET_WIPE_OTHERS = "false";
+process.env.DEMO_RESET_DATABASE_URL = "";
 for (const key of ["DEMO_OWNER_EMAIL", "DEMO_ADMIN_EMAIL", "DEMO_VIEWER_EMAIL"]) process.env[key] = "";
 
 const env = require("../../config/env");

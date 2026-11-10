@@ -75,6 +75,17 @@ const envSchema = z.object({
   DEMO_OWNER_EMAIL: optionalEmail,
   DEMO_ADMIN_EMAIL: optionalEmail,
   DEMO_VIEWER_EMAIL: optionalEmail,
+  // Only for the demo reset script (ADR 0017), never for the API. Its own database role, which may
+  // TRUNCATE; kept in a file outside server/.env so the API process never holds it. Null when unset.
+  DEMO_RESET_DATABASE_URL: z
+    .preprocess((value) => (value === "" ? undefined : value), postgresUrl.optional())
+    .transform((value) => value ?? null),
+  // The second switch of the reset: lets it delete organizations created through sign-up. Off unless
+  // "true"; set it only on a server whose database serves the demo and nothing else.
+  DEMO_RESET_WIPE_OTHERS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 }).superRefine((value, ctx) => {
   checkDemoAccounts(value, ctx);
   if (value.NODE_ENV === "test" && !value.TEST_DATABASE_URL) {

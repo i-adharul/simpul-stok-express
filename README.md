@@ -55,6 +55,16 @@ Client (from `client/`): `npm run dev` for the Vite dev server, `npm run build` 
 
 Deploy (on the EC2 host, not locally): `./server/scripts/deploy.sh [branch]`. Migrations are not part of it; see [ADR 0008](docs/decisions/0008-deployment-layout.md).
 
+## Demo reset
+
+The public demo is restored every day at 03:00 WIB by a script that the host's `crontab` runs, never by the API ([ADR 0017](docs/decisions/0017-production-demo-reset.md)). It empties the database with `TRUNCATE` and seeds the demo again, so **everything in that database is deleted every night, including organizations created through sign-up**. Because of that:
+
+- it connects with its own role (`simpul_reset`) through `DEMO_RESET_DATABASE_URL`, kept in a file outside `server/.env`, and refuses to use the application role;
+- it refuses a non-local host unless `SEED_ALLOW_REMOTE=true`, and refuses when an organization outside the two demo ones exists unless `DEMO_RESET_WIPE_OTHERS=true`;
+- set that switch only on a server whose database serves the demo and nothing else. Never on a database with real customers.
+
+Locally: `cd server && npm run demo:reset`.
+
 ## Documentation
 
 Start with [docs/README.md](docs/README.md). Architecture decisions are in [docs/decisions/](docs/decisions/). The UI is in Indonesian; code and documents are in English.
