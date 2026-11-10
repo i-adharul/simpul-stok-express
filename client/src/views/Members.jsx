@@ -32,7 +32,7 @@ function ListState({ list, emptyMessage, children }) {
 }
 
 // Kebab menu of a row. The Owner row and an inactive member have no actions.
-function RowActions({ member, onEdit, onDeactivate }) {
+function RowActions({ member, onEdit, onResetLink, onDeactivate }) {
   if (member.role === 'OWNER' || !member.isActive) return null
   const pick = (action) => () => {
     document.activeElement?.blur()
@@ -48,6 +48,9 @@ function RowActions({ member, onEdit, onDeactivate }) {
           <button type="button" onClick={pick(onEdit)}>Ubah akses</button>
         </li>
         <li>
+          <button type="button" onClick={pick(onResetLink)}>Buat tautan reset</button>
+        </li>
+        <li>
           <button type="button" className="text-error" onClick={pick(onDeactivate)}>Nonaktifkan</button>
         </li>
       </ul>
@@ -55,7 +58,7 @@ function RowActions({ member, onEdit, onDeactivate }) {
   )
 }
 
-function MembersTable({ list, activeCount, onEdit, onDeactivate }) {
+function MembersTable({ list, activeCount, onEdit, onResetLink, onDeactivate }) {
   const { data, loading, page, setPage } = list
   return (
     <div className={`rounded-xl border border-base-300 bg-base-100 ${loading ? 'opacity-60' : ''}`}>
@@ -87,7 +90,7 @@ function MembersTable({ list, activeCount, onEdit, onDeactivate }) {
                   <span className={`badge badge-soft ${m.isActive ? 'badge-success' : 'badge-ghost'}`}>{m.isActive ? 'Aktif' : 'Nonaktif'}</span>
                 </td>
                 <td className="text-right">
-                  <RowActions member={m} onEdit={onEdit} onDeactivate={onDeactivate} />
+                  <RowActions member={m} onEdit={onEdit} onResetLink={onResetLink} onDeactivate={onDeactivate} />
                 </td>
               </tr>
             ))}
@@ -150,6 +153,8 @@ export default function Members() {
   const [inviting, setInviting] = useState(false)
   // The 201 answer ({ invitation, token }) while P08 is open; dropped on close so the token is gone.
   const [created, setCreated] = useState(null)
+  // { token, email } while P08 shows a reset link; dropped on close so the token is gone.
+  const [resetLink, setResetLink] = useState(null)
   const [cancellingId, setCancellingId] = useState(null)
   const [editing, setEditing] = useState(null) // member row for P09
   const [deactivating, setDeactivating] = useState(null) // member row for P10
@@ -165,6 +170,18 @@ export default function Members() {
     setInviting(false)
     setCreated(answer)
     invitations.reload()
+  }
+
+  // POST answers 201 { token, expiresAt } once; the new link replaces any older one. Errors show as a toast
+  // (409: the member is no longer active, 404: gone), then the list reloads so the row matches the server.
+  async function createResetLink(member) {
+    try {
+      const { data } = await http.post(`/api/members/${member.id}/reset-link`, {})
+      setResetLink({ token: data.token, email: member.email })
+    } catch (error) {
+      toast.error(errorText(error) ?? GENERIC_ERROR)
+      if (error.response?.status === 404 || error.response?.status === 409) members.reload()
+    }
   }
 
   // DELETE removes the row, so the link stops working. 404 means it is already gone: reload either way.
@@ -203,7 +220,7 @@ export default function Members() {
       <section className="space-y-3">
         <h2 className="font-bold">Anggota{members.data ? ` (${members.data.total})` : ''}</h2>
         <ListState list={members} emptyMessage="Belum ada anggota.">
-          <MembersTable list={members} activeCount={activeCount} onEdit={setEditing} onDeactivate={setDeactivating} />
+          <MembersTable list={members} activeCount={activeCount} onEdit={setEditing} onResetLink={createResetLink} onDeactivate={setDeactivating} />
         </ListState>
       </section>
 
@@ -216,6 +233,7 @@ export default function Members() {
       {editing && <ChangeMemberAccessModal member={editing} warehouses={warehouses?.items ?? []} onSaved={() => handleMemberChanged('Akses anggota diperbarui.')} onClose={() => setEditing(null)} />}
       {deactivating && <DeactivateMemberModal member={deactivating} onDone={() => handleMemberChanged('Anggota dinonaktifkan.')} onClose={() => setDeactivating(null)} />}
       {created && <InvitationLinkModal path={`/invite/${created.token}`} email={created.invitation.email} role={created.invitation.role} onClose={() => setCreated(null)} />}
+      {resetLink && <InvitationLinkModal kind="reset" path={`/reset/${resetLink.token}`} email={resetLink.email} onClose={() => setResetLink(null)} />}
       {inviting && <InviteMemberModal warehouses={warehouses.items} onCreated={handleCreated} onClose={() => setInviting(false)} />}
     </div>
   )
