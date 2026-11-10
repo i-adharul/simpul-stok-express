@@ -48,7 +48,13 @@ export default function Profile() {
         <h2 className="border-b border-base-300 pb-3 font-bold">Keamanan</h2>
         <div className="flex items-center justify-between pt-4">
           <span className="font-semibold">Password</span>
-          <button type="button" className="btn btn-sm" onClick={() => setChanging(true)}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={user.isDemo}
+            title={user.isDemo ? 'Akun demo tidak dapat mengubah password.' : undefined}
+            onClick={() => setChanging(true)}
+          >
             Ubah password
           </button>
         </div>

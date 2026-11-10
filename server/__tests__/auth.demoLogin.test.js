@@ -117,7 +117,7 @@ describe("POST /api/auth/demo-login: the three roles", () => {
     const me = await request(app).get("/api/me").set("Authorization", `Bearer ${body.token}`);
 
     expect(me.status).toBe(200);
-    expect(me.body.user).toEqual({ id: users[role].id, name: `Demo ${role}`, email: EMAILS[role], role });
+    expect(me.body.user).toEqual({ id: users[role].id, name: `Demo ${role}`, email: EMAILS[role], role, isDemo: true });
     expect(me.body.organization.slug).toBe("tokomaju");
   });
 });

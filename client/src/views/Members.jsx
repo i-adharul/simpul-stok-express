@@ -47,12 +47,17 @@ function RowActions({ member, onEdit, onResetLink, onDeactivate }) {
         <li>
           <button type="button" onClick={pick(onEdit)}>Ubah akses</button>
         </li>
-        <li>
-          <button type="button" onClick={pick(onResetLink)}>Buat tautan reset</button>
-        </li>
-        <li>
-          <button type="button" className="text-error" onClick={pick(onDeactivate)}>Nonaktifkan</button>
-        </li>
+        {/* BL31: a shared demo account gets no reset link and cannot be deactivated. */}
+        {!member.isDemo && (
+          <>
+            <li>
+              <button type="button" onClick={pick(onResetLink)}>Buat tautan reset</button>
+            </li>
+            <li>
+              <button type="button" className="text-error" onClick={pick(onDeactivate)}>Nonaktifkan</button>
+            </li>
+          </>
+        )}
       </ul>
     </div>
   )

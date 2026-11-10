@@ -28,7 +28,7 @@ describe("GET /api/me", () => {
     expect(res.status).toBe(200);
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(res.body).toEqual({
-      user: { id: user.id, name: "Sari Admin", email: user.email, role: "WAREHOUSE_ADMIN" },
+      user: { id: user.id, name: "Sari Admin", email: user.email, role: "WAREHOUSE_ADMIN", isDemo: false },
       organization: {
         id: user.organizationId,
         name: "Toko",
@@ -45,7 +45,7 @@ describe("GET /api/me", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      user: { id: user.id, name: user.name, email: user.email, role: "PLATFORM_ADMIN" },
+      user: { id: user.id, name: user.name, email: user.email, role: "PLATFORM_ADMIN", isDemo: false },
       organization: null,
     });
   });

@@ -55,7 +55,7 @@ describe("GET /api/members", () => {
 
     for (const item of res.body.items) {
       expect(Object.keys(item).sort()).toEqual(
-        ["allWarehouses", "email", "id", "isActive", "lastLoginAt", "name", "role", "warehouses"].sort(),
+        ["allWarehouses", "email", "id", "isActive", "isDemo", "lastLoginAt", "name", "role", "warehouses"].sort(),
       );
     }
     expect(JSON.stringify(res.body)).not.toMatch(/passwordHash|resetToken|resetExpires|\$2[aby]\$/);

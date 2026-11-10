@@ -11,7 +11,7 @@ const { signToken } = require("../helpers/jwt");
 const { getSequelize } = require("./support/db");
 const { clearTables } = require("./support/clearTables");
 const { createAccount, readUser } = require("./support/accounts");
-const { createOrganization } = require("./support/factories");
+const { createOrganization, giveRoomyPlan } = require("./support/factories");
 
 jest.setTimeout(60000);
 
@@ -37,6 +37,7 @@ beforeEach(async () => {
   });
   const organizationId = await createOrganization("tokomaju");
   const other = await createOrganization("tokolain");
+  await giveRoomyPlan(organizationId, other);
   users = {
     DEMO_OWNER: await createAccount({ email: "owner@example.com", role: "OWNER", organizationId }),
     DEMO_ADMIN: await createAccount({ email: "admin@example.com", role: "WAREHOUSE_ADMIN", organizationId }),
@@ -184,6 +185,38 @@ describe("what is not refused", () => {
     expect((await resetLink(users.DEMO_ADMIN.id)).status).toBe(201);
     expect((await patchMember(users.DEMO_ADMIN.id, { role: "VIEWER" })).status).toBe(200);
     expect((await patchMember(users.DEMO_VIEWER.id, { isActive: false })).status).toBe(200);
+  });
+});
+
+describe("the isDemo flag the app reads (GET /api/me and GET /api/members)", () => {
+  const me = (caller) => request(app).get("/api/me").set(as(caller));
+
+  it.each([
+    ["DEMO_OWNER", true],
+    ["DEMO_ADMIN", true],
+    ["DEMO_VIEWER", true],
+    ["REGULAR_ADMIN", false],
+  ])("GET /api/me for %s says isDemo %s", async (key, expected) => {
+    expect((await me(key)).body.user.isDemo).toBe(expected);
+  });
+
+  it("GET /api/members marks only the demo accounts", async () => {
+    const res = await request(app).get("/api/members").set(as("DEMO_OWNER"));
+
+    const flags = Object.fromEntries(res.body.items.map((m) => [m.email, m.isDemo]));
+    expect(flags).toEqual({
+      "owner@example.com": true,
+      "admin@example.com": true,
+      "viewer@example.com": true,
+      "sari@example.com": false,
+      "dewi@example.com": false,
+    });
+  });
+
+  it("with DEMO_MODE off nobody is flagged", async () => {
+    mockEnv.DEMO_MODE = false;
+
+    expect((await me("DEMO_OWNER")).body.user.isDemo).toBe(false);
   });
 });
 
