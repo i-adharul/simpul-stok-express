@@ -36,8 +36,9 @@ describe("/api/platform/* guard on the real app", () => {
     await db.sequelize.close();
   });
 
+  // A path that has no endpoint, so the guard is proven alone, whatever endpoints the prefix gains.
   const get = (token) => {
-    const req = request(app).get("/api/platform/organizations");
+    const req = request(app).get("/api/platform/no-such-endpoint");
     return token ? req.set("Authorization", `Bearer ${token}`) : req;
   };
 

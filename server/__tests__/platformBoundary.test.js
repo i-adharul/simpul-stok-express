@@ -37,7 +37,8 @@ describe("a Platform admin on the tenant routes the harness does not attack", ()
 });
 
 describe("/api/platform/*", () => {
-  const labels = [...Object.keys(PLATFORM_ROUTES), "GET /platform/organizations", "PATCH /platform/organizations/:id/status"];
+  // Labels not yet built (E11-05) are listed too: the prefix guard already answers them.
+  const labels = [...new Set([...Object.keys(PLATFORM_ROUTES), "PATCH /platform/organizations/:id/status"])];
 
   it.each(labels)("%s: no token is 401", async (label) => {
     expect((await call(label)).status).toBe(401);
