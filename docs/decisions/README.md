@@ -2,7 +2,7 @@
 
 One file per decision. A decision that is replaced stays in the list with its status changed.
 
-The numbers below are reserved from the start so that other documents can refer to them. A record is written in the story named in the last column, and it starts with status `proposed`, which changes to `accepted` once the maintainer agrees (`superseded` when a later record replaces it). The table shows the current status.
+The numbers below are reserved from the start so that other documents can refer to them. A record is written in the story named in the last column, and it starts with status `proposed`, which changes to `accepted` once the maintainer agrees (`superseded` when a later record replaces it). The table shows the current status. Number 0015 is reserved for the payment gateway decision (E9-01).
 
 | No   | Title                                                                                    | Status   | Story |
 | ---- | ---------------------------------------------------------------------------------------- | -------- | ----- |
@@ -20,6 +20,7 @@ The numbers below are reserved from the start so that other documents can refer 
 | 0012 | Idempotency by a key row written in the same transaction as the business effect          | accepted | E4-01 |
 | 0013 | Warehouse row lock as the serialization point for stock writes                           | accepted | E4-02 |
 | 0014 | Transfer code without a shared row, and two-warehouse locking for transfers              | accepted | E5-03 |
+| 0016 | Demo access model (configured demo accounts, one public endpoint, a normal token)        | accepted | E15-01 |
 
 ## Format
 

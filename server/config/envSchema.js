@@ -11,6 +11,30 @@ const origins = z
   .transform((value) => value.split(",").map((item) => item.trim()))
   .pipe(z.array(z.url()).min(1));
 
+// An optional email of a demo account: trimmed and lowercase (the login matches lowercase), null when
+// unset or empty. Whether it is required and valid is judged below, together with DEMO_MODE.
+const optionalEmail = z
+  .string()
+  .optional()
+  .transform((value) => value?.trim().toLowerCase() || null);
+
+const DEMO_EMAIL_KEYS = ["DEMO_OWNER_EMAIL", "DEMO_ADMIN_EMAIL", "DEMO_VIEWER_EMAIL"];
+
+// Demo mode (BL31): one-click access to three shared accounts. The list of accounts lives here, not in
+// the database, and has no platform admin. Only when DEMO_MODE is on must the three be set, valid and
+// different from each other (two roles on one account would make the role buttons lie).
+function checkDemoAccounts(value, ctx) {
+  if (!value.DEMO_MODE) return;
+  const emails = DEMO_EMAIL_KEYS.map((key) => value[key]);
+  DEMO_EMAIL_KEYS.forEach((key) => {
+    if (!value[key]) ctx.addIssue({ code: "custom", path: [key], message: "is required when DEMO_MODE is true" });
+    else if (!z.email().safeParse(value[key]).success) ctx.addIssue({ code: "custom", path: [key], message: "must be an email address" });
+  });
+  if (emails.every(Boolean) && new Set(emails).size !== emails.length) {
+    ctx.addIssue({ code: "custom", path: ["DEMO_OWNER_EMAIL"], message: "the three demo emails must be different" });
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]),
   PORT: z.coerce.number().int().min(1).max(65535),
@@ -42,7 +66,17 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value || null),
+  // Off unless "true" (BL31): then POST /api/auth/demo-login signs visitors in as one of the three
+  // demo accounts below, without a password. Off, that endpoint answers 404.
+  DEMO_MODE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  DEMO_OWNER_EMAIL: optionalEmail,
+  DEMO_ADMIN_EMAIL: optionalEmail,
+  DEMO_VIEWER_EMAIL: optionalEmail,
 }).superRefine((value, ctx) => {
+  checkDemoAccounts(value, ctx);
   if (value.NODE_ENV === "test" && !value.TEST_DATABASE_URL) {
     ctx.addIssue({
       code: "custom",
