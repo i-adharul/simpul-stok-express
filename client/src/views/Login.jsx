@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
+import DemoPanel from '../components/DemoPanel'
 import ErrorState from '../components/ErrorState'
 import { useAuth } from '../context/authContext'
 
@@ -153,6 +154,9 @@ export default function Login() {
             </button>
             <p className="text-center text-xs text-base-content/70">Lupa password? Hubungi Owner organisasi Anda.</p>
           </form>
+
+          <div className="divider my-6 text-xs text-base-content/60">atau coba demo</div>
+          <DemoPanel />
 
           <div className="mt-6 border-t border-base-300 pt-6 text-center text-sm text-base-content/70">
             Belum punya akun?{' '}
