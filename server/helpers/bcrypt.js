@@ -1,7 +1,12 @@
 const bcrypt = require("bcryptjs");
 
-// CLAUDE.md / docs/05: bcryptjs with cost 12.
-const COST = 12;
+// CLAUDE.md / docs/05: bcryptjs with cost 12 in production.
+const PRODUCTION_COST = 12;
+// Tests hash passwords with cost 4 (Jest only). Both conditions are required, and no other
+// environment variable can lower the cost. Computed once, when the module is loaded.
+const TEST_COST = 4;
+const COST =
+  process.env.NODE_ENV === "test" && process.env.JEST_WORKER_ID !== undefined ? TEST_COST : PRODUCTION_COST;
 // bcrypt reads only the first 72 bytes: without the guard below, "<72 bytes>zzz" would be accepted
 // as the password "<72 bytes>". See helpers/password.js, which refuses such passwords when they are set.
 const MAX_BYTES = 72;
@@ -21,4 +26,4 @@ async function comparePassword(plain, hash) {
   }
 }
 
-module.exports = { hashPassword, comparePassword, COST };
+module.exports = { hashPassword, comparePassword, COST, PRODUCTION_COST };
