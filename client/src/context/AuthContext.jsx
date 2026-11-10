@@ -82,6 +82,17 @@ export function AuthProvider({ children }) {
     return data.redirectTo
   }, [])
 
+  // Demo login (S01, BL31): the same answer shape as login (token and redirectTo), so the same session start.
+  const demoLogin = useCallback(async (role) => {
+    const { data } = await http.post('/api/auth/demo-login', { role })
+    setToken(data.token)
+    const me = await http.get('/api/me')
+    setSession({ user: me.data.user, organization: me.data.organization })
+    setSessionExpired(false)
+    setConnectionFailed(false)
+    return data.redirectTo
+  }, [])
+
   // Accepting an invitation (S03): same answer shape as login (token and redirectTo), so the same session start.
   const acceptInvite = useCallback(async (payload) => {
     const { data } = await http.post('/api/auth/accept-invite', payload)
@@ -109,8 +120,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, acceptInvite, updateOrganization, logout }),
-    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, registerOrganization, acceptInvite, updateOrganization, logout],
+    () => ({ ...session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, demoLogin, registerOrganization, acceptInvite, updateOrganization, logout }),
+    [session, loading, connectionFailed, retrySession, sessionExpired, dismissSessionExpired, login, demoLogin, registerOrganization, acceptInvite, updateOrganization, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
