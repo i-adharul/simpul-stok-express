@@ -14,6 +14,7 @@ const EXEMPT_ROUTES = {
 const PUBLIC_ROUTES = {
   "GET /health": "Health check: no session and no tenant data.",
   "POST /auth/login": "Before any session exists: the organization is not known yet.",
+  "POST /auth/demo-login": "Before any session exists. The role in the body picks one of three accounts from the configuration; no ID or email comes from the request, the platform admin is never accepted, and it answers 404 unless DEMO_MODE is on.",
   "POST /auth/register-organization": "Public sign-up: no organization exists yet, so there is no tenant data to read; the service creates the organization and never uses the tenant data access.",
   "POST /auth/accept-invite": "Public: the person has no account yet and the token in the body is the proof. The organization comes from the invitation row found by the token hash, never from the request.",
   "GET /invitations/:token": "Public: the person who opens the link has no account yet. The token is looked up by its hash; every invalid token is one identical 404, so there is no foreign ID to swap.",

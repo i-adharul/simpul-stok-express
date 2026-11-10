@@ -10,6 +10,8 @@ const { listRoutes, findUnguardedWriteRoutes } = require("./support/routeInspect
 const ALLOWED_WITHOUT_GUARD = [
   "POST /auth/login",
   "POST /auth/logout",
+  // BL31: a visitor has no session yet; the configured demo accounts must be reachable in any state.
+  "POST /auth/demo-login",
   // BL04: a new customer has no organization yet, so there is no subscription to check.
   "POST /auth/register-organization",
   // BL06: the person has no session yet; the token in the body is the proof.

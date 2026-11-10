@@ -1,9 +1,11 @@
 const { UniqueConstraintError } = require("sequelize");
+const env = require("../config/env");
 const { comparePassword, hashPassword } = require("../helpers/bcrypt");
 const {
   conflict,
   invalidCredentials,
   invalidCurrentPassword,
+  notFound,
   unauthenticated,
   validationError,
 } = require("../helpers/errors");
@@ -46,6 +48,33 @@ async function login({ email, password }) {
   await touchLastLogin(user.id);
   return {
     token: signToken(user.id),
+    user: publicUser(user),
+    redirectTo: redirectFor(user.role),
+  };
+}
+
+// BL31. Which environment variable holds the email of each demo role. The role comes from the request
+// (already one of three values, demoLoginSchema); the email never does.
+const DEMO_EMAIL_KEY = {
+  OWNER: "DEMO_OWNER_EMAIL",
+  WAREHOUSE_ADMIN: "DEMO_ADMIN_EMAIL",
+  VIEWER: "DEMO_VIEWER_EMAIL",
+};
+const DEMO_TOKEN_LIFETIME = "8h"; // BL31 says 8 hours, whatever JWT_EXPIRES_IN is
+
+// BL31, ADR 0016. A token for the configured account of the role, without a password. Every refusal is
+// the same 404: demo mode off (also checked by the middleware before validate), no such account, an
+// inactive one, or an account that does not hold the role it is configured for (so a wrong email in the
+// configuration, even the platform admin's, can never be signed in through this door).
+async function demoLogin({ role }) {
+  if (!env.DEMO_MODE) throw notFound();
+  const email = env[DEMO_EMAIL_KEY[role]];
+  const user = email ? await findUserByEmail(email) : null;
+  if (!user || !user.isActive || user.role !== role) throw notFound();
+
+  await touchLastLogin(user.id);
+  return {
+    token: signToken(user.id, DEMO_TOKEN_LIFETIME),
     user: publicUser(user),
     redirectTo: redirectFor(user.role),
   };
@@ -180,4 +209,4 @@ async function acceptInvite({ token, name, password }) {
   return { token: signToken(user.id), user, redirectTo: "/dashboard" };
 }
 
-module.exports = { login, changePassword, acceptInvite };
+module.exports = { login, demoLogin, changePassword, acceptInvite };
