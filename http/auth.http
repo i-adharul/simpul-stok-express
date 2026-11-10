@@ -21,6 +21,21 @@ Content-Type: application/json
 
 { "email": "owner@kopisenja.example.com", "password": "Simpul-Demo-2026" }
 
+### Demo login (public, no password). Only when the server runs with DEMO_MODE=true and the three DEMO_*_EMAIL set
+# cd server && DEMO_MODE=true DEMO_OWNER_EMAIL=owner@example.com DEMO_ADMIN_EMAIL=admin@example.com DEMO_VIEWER_EMAIL=viewer@example.com npm run dev
+# Expect 200 {"token","user":{"id","name","email","role"},"redirectTo":"/dashboard"}; the token lasts 8 hours.
+# With DEMO_MODE off (the default): 404 NOT_FOUND, whatever the body. Role PLATFORM_ADMIN or any other value: 400 VALIDATION_ERROR.
+POST http://localhost:3000/api/auth/demo-login
+Content-Type: application/json
+
+{ "role": "VIEWER" }
+
+### Demo login with a role that is not allowed: 400 VALIDATION_ERROR (needs DEMO_MODE=true)
+POST http://localhost:3000/api/auth/demo-login
+Content-Type: application/json
+
+{ "role": "PLATFORM_ADMIN" }
+
 ### Wrong password, unknown email, inactive user, password over 72 bytes: one identical answer
 # Expect 401 {"code":"INVALID_CREDENTIALS","message":"Email atau password salah.","details":null}
 POST http://localhost:3000/api/auth/login
