@@ -3,6 +3,8 @@ const app = require("../app");
 const db = require("../models");
 const { logger } = require("../helpers/logger");
 const organizationAccess = require("../helpers/organizationAccess");
+const { COST } = require("../helpers/bcrypt");
+const { bcryptPrefix } = require("./support/bcryptPrefix");
 const { getSequelize } = require("./support/db");
 const { clearTables } = require("./support/clearTables");
 const { createAccount } = require("./support/accounts");
@@ -58,7 +60,7 @@ describe("POST /api/auth/register-organization: success", () => {
     const [plan] = await rows("Plans");
     expect(org).toMatchObject({ id: res.body.organization.id, name: "Toko Maju", slug: "tokomaju", status: "TRIAL" });
     expect(owner).toMatchObject({ organizationId: org.id, role: "OWNER", isActive: true, email: "budi@tokomaju.example" });
-    expect(owner.passwordHash).toMatch(/^\$2[aby]\$12\$/);
+    expect(owner.passwordHash).toMatch(bcryptPrefix(COST));
     expect(sub).toMatchObject({ organizationId: org.id, planId: plan.id, billingDay: null });
     const start = new Date(sub.currentPeriodStart).getTime();
     expect(start).toBeGreaterThanOrEqual(before);

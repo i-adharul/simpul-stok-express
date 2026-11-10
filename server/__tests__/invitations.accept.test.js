@@ -7,6 +7,8 @@ const invitationAccess = require("../helpers/invitationAccess");
 const { signToken } = require("../helpers/jwt");
 const { logger } = require("../helpers/logger");
 const { generateToken, hashToken } = require("../helpers/token");
+const { COST } = require("../helpers/bcrypt");
+const { bcryptPrefix } = require("./support/bcryptPrefix");
 const { getSequelize } = require("./support/db");
 const { clearTables } = require("./support/clearTables");
 const { createAccount, readUser } = require("./support/accounts");
@@ -111,7 +113,7 @@ describe("POST /api/auth/accept-invite: success", () => {
     });
     const [user] = await usersByEmail("sari@example.com");
     expect(user).toMatchObject({ organizationId: orgA, role: "WAREHOUSE_ADMIN", isActive: true });
-    expect(user.passwordHash).toMatch(/^\$2[aby]\$12\$/);
+    expect(user.passwordHash).toMatch(bcryptPrefix(COST));
     expect((await assignments(user.id)).map((r) => r.warehouseId).sort()).toEqual([w1, w2].sort());
     expect((await invitationRow(id)).acceptedAt).not.toBeNull();
     const me = await request(app).get("/api/me").set("Authorization", `Bearer ${res.body.token}`);
