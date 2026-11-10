@@ -76,3 +76,15 @@ Content-Type: application/json
   "email": "budi@tokomaju.example",
   "password": "short"
 }
+
+### Open a reset link (public, no token header). Use the "token" from POST /api/members/:id/reset-link.
+# Expect 200 {"email"}. A malformed, unknown, replaced, used or expired token, or an inactive member, gives one identical 404.
+GET http://localhost:3000/api/auth/reset-password/PASTE_THE_RAW_TOKEN_HERE
+
+### Set a new password with the reset link (public). Single-use; every older token of the member gets 401.
+# Expect 204 with no body. Then sign in with the new password through POST /api/auth/login.
+# A second call with the same token gives 404 (checked before the password); a refused password gives 400 VALIDATION_ERROR.
+POST http://localhost:3000/api/auth/reset-password
+Content-Type: application/json
+
+{ "token": "PASTE_THE_RAW_TOKEN_HERE", "password": "Kopi-Susu-2027" }

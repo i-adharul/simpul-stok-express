@@ -18,7 +18,7 @@ Milestone M1 (core inventory) is complete and deployed.
 
 - Demo (client): https://simpulstok.adharul.my.id
 - API: https://simpulstok-api.adharul.my.id (`GET /api/health` shows the running commit)
-- Server tests: 123 suites, 2020 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-09). The client builds with `cd client && npm run build`. There is no CI.
+- Server tests: 150 suites, 2478 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-10). The client builds with `cd client && npm run build`. There is no CI.
 
 **Open follow-up:** the full P0 flow has **not** yet been verified end to end in production. The deployed API and client are live, but the main-flow test (E6-03) only runs against a local database.
 
