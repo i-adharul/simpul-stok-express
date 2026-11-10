@@ -32,7 +32,7 @@ export default function LandingLayout() {
             ))}
           </nav>
           <div className="flex items-center gap-1 sm:gap-2">
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="Kode di GitHub" className="btn btn-ghost btn-sm btn-square">
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="Kode di GitHub" className="btn btn-ghost btn-sm btn-square hidden sm:inline-flex">
               <GithubIcon />
             </a>
             <Link to="/login" className="btn btn-ghost btn-sm">
