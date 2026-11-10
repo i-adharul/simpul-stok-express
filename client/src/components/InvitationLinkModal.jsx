@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { ROLE_LABELS } from '../constants/navigation'
 
 const TEXTS = {
-  invitation: { title: 'Undangan dibuat', intro: 'Tautan undangan telah siap untuk', linkLabel: 'Tautan undangan' },
-  reset: { title: 'Tautan reset dibuat', intro: 'Tautan reset password telah siap untuk', linkLabel: 'Tautan reset' },
+  invitation: { title: 'Undangan dibuat', intro: 'Tautan undangan telah siap untuk', linkLabel: 'Tautan undangan', note: 'Tautan hanya ditampilkan sekali. Kirimkan ke calon anggota.' },
+  reset: { title: 'Tautan reset password', intro: 'Tautan reset password telah siap untuk', linkLabel: 'Tautan reset', note: 'Tautan hanya ditampilkan sekali. Kirimkan ke anggota yang bersangkutan.' },
 }
 
-// P08. `kind` is "invitation" (after P07) or "reset" (reused by the reset-link action in E7-09). `path` is
+// P08. `kind` is "invitation" (after P07) or "reset" (the reset-link action of S14). `path` is
 // "/invite/<token>" or "/reset/<token>". The raw token is only in the API answer that created it, so closing
 // this popup is the last time the link can be copied.
 export default function InvitationLinkModal({ kind = 'invitation', path, email, role, onClose }) {
@@ -55,7 +55,7 @@ export default function InvitationLinkModal({ kind = 'invitation', path, email, 
           </div>
           {copyFailed && <p role="alert" className="text-sm font-medium text-error">Tidak dapat menyalin otomatis. Pilih teks tautan lalu salin manual.</p>}
         </div>
-        <p className="alert alert-info alert-soft text-sm">Tautan hanya ditampilkan sekali. Kirimkan ke calon anggota.</p>
+        <p className="alert alert-info alert-soft text-sm">{text.note}</p>
         <div className="modal-action">
           <button type="button" className="btn" onClick={onClose}>
             Selesai
