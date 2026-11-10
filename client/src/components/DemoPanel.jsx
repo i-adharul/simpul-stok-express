@@ -1,36 +1,9 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
-import { useAuth } from '../context/authContext'
+import { DEMO_ROLES, useDemoSignIn } from '../utils/useDemoSignIn'
 
-const DEMO_ROLES = [
-  { role: 'OWNER', label: 'Owner', text: 'Kelola gudang, produk, anggota, dan pengaturan organisasi.' },
-  { role: 'WAREHOUSE_ADMIN', label: 'Admin Gudang', text: 'Catat penerimaan, penyesuaian, dan mutasi stok di gudang yang ditugaskan.' },
-  { role: 'VIEWER', label: 'Viewer', text: 'Lihat stok dan riwayat saja, tanpa bisa mengubah data.' },
-]
-
-const UNAVAILABLE = 'Demo sedang tidak tersedia. Coba lagi sebentar.'
-
-// S01, BL31. The "Coba demo" panel: an explanation box and one button per demo role. A click signs in
-// through POST /api/auth/demo-login, stores the token like a normal login, then goes to S04. Every
-// failure (404 demo off, 5xx, no network) shows the same message.
+// S01, BL31. The "Coba demo" panel: an explanation box and one button per demo role. The sign-in
+// itself (and its single error message) lives in useDemoSignIn, shared with the landing page (S24).
 export default function DemoPanel() {
-  const { demoLogin } = useAuth()
-  const navigate = useNavigate()
-  const [pending, setPending] = useState(null) // the role being signed in, or null
-  const [error, setError] = useState(null)
-
-  async function handleClick(role) {
-    if (pending) return
-    setPending(role)
-    setError(null)
-    try {
-      const redirectTo = await demoLogin(role)
-      navigate(redirectTo === '/platform' ? '/platform/organizations' : redirectTo, { replace: true })
-    } catch {
-      setError(UNAVAILABLE)
-      setPending(null)
-    }
-  }
+  const { pending, error, signIn } = useDemoSignIn()
 
   return (
     <section aria-labelledby="demo-title" className="space-y-3">
@@ -47,7 +20,7 @@ export default function DemoPanel() {
               type="button"
               className="btn btn-outline h-auto w-full flex-col items-start gap-0.5 py-2.5 text-left"
               disabled={Boolean(pending)}
-              onClick={() => handleClick(item.role)}
+              onClick={() => signIn(item.role)}
             >
               <span className="font-semibold">{pending === item.role ? 'Masuk...' : `Masuk sebagai ${item.label}`}</span>
               <span className="text-xs font-normal text-base-content/70">{item.text}</span>

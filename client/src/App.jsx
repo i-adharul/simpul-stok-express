@@ -1,6 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import BaseLayout from './layouts/BaseLayout'
 import PlatformLayout from './layouts/PlatformLayout'
+import LandingLayout from './layouts/LandingLayout'
+import Landing from './views/Landing'
+import PublicOnlyRoute from './components/PublicOnlyRoute'
 import PlatformOrganizations from './views/PlatformOrganizations'
 import ProtectedRoute from './components/ProtectedRoute'
 import RoleRoute from './components/RoleRoute'
@@ -34,6 +37,11 @@ function App() {
       <ApiErrorRedirect />
       <ErrorBoundary>
         <Routes>
+          <Route element={<PublicOnlyRoute />}>
+            <Route element={<LandingLayout />}>
+              <Route index element={<Landing />} />
+            </Route>
+          </Route>
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           <Route path="invite/:token" element={<AcceptInvite />} />
@@ -45,7 +53,6 @@ function App() {
           </Route>
           <Route element={<ProtectedRoute />}>
             <Route element={<BaseLayout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="profile" element={<Profile />} />
               <Route element={<RoleRoute roles={['OWNER']} />}>
                 <Route path="settings" element={<OrganizationSettings />} />
