@@ -18,6 +18,7 @@ Milestone M1 (core inventory) is complete and deployed.
 
 - Demo (client): https://simpulstok.adharul.my.id
 - API: https://simpulstok-api.adharul.my.id (`GET /api/health` shows the running commit)
+- Plan limits (BL20) are enforced in the server and shown in the client: creating or restoring a warehouse or product, inviting a member and accepting an invitation answer `PLAN_LIMIT_REACHED` (403) above the plan limit.
 - Server tests: 150 suites, 2478 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-10). The client builds with `cd client && npm run build`. There is no CI.
 
 **Open follow-up:** the full P0 flow has **not** yet been verified end to end in production. The deployed API and client are live, but the main-flow test (E6-03) only runs against a local database.
