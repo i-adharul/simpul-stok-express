@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router'
 import DemoPanel from '../components/DemoPanel'
 import ErrorState from '../components/ErrorState'
 import { useAuth } from '../context/authContext'
+import { useDemoAvailable } from '../utils/useDemoAvailable'
 
 const BENEFITS = [
   { icon: 'warehouse', title: 'Multi-gudang', text: 'Pantau dan kelola stok di seluruh cabang dan gudang pusat secara terpusat.' },
@@ -66,6 +67,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const demoAvailable = useDemoAvailable()
 
   // Someone who is already logged in has no business here.
   if (!loading && user) return <Navigate to={user.role === 'PLATFORM_ADMIN' ? '/platform/organizations' : '/dashboard'} replace />
@@ -94,69 +96,79 @@ export default function Login() {
 
           {connectionFailed && <ErrorState message="Server tidak dapat dihubungi. Coba lagi." onRetry={retrySession} />}
 
-          <form className="mt-7 space-y-5" onSubmit={handleSubmit} noValidate>
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="text-sm font-semibold">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="username"
-                required
-                maxLength={254}
-                placeholder="nama@perusahaan.com"
-                className="input w-full"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="text-sm font-semibold">
-                Password
-              </label>
-              <div className="relative">
+          {/* On a phone the demo panel sits above the form (order-first); on a wide screen it sits below it. */}
+          <div className="flex flex-col">
+            <form className="mt-7 space-y-5" onSubmit={handleSubmit} noValidate>
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-sm font-semibold">
+                  Email
+                </label>
                 <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="username"
                   required
-                  maxLength={128}
-                  placeholder="Masukkan password"
-                  className={`input w-full pr-10 ${error ? 'input-error' : ''}`}
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error ? 'login-error' : undefined}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  maxLength={254}
+                  placeholder="nama@perusahaan.com"
+                  className="input w-full"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                 />
-                <button
-                  type="button"
-                  aria-label="Tampilkan atau sembunyikan password"
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-base-content/50 hover:text-base-content"
-                  onClick={() => setShowPassword((value) => !value)}
-                >
-                  <Icon name={showPassword ? 'visibility_off' : 'visibility'} className="text-[20px]" />
-                </button>
               </div>
-              {error && (
-                <p id="login-error" role="alert" className="flex items-center gap-1.5 pt-1 text-sm font-medium text-error">
-                  <Icon name="error" className="text-[18px]" />
-                  {error}
-                </p>
-              )}
-            </div>
 
-            <button type="submit" className="btn btn-primary w-full" disabled={submitting || !email || !password}>
-              {submitting ? <span className="loading loading-spinner loading-sm" /> : 'Masuk'}
-            </button>
-            <p className="text-center text-xs text-base-content/70">Lupa password? Hubungi Owner organisasi Anda.</p>
-          </form>
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="text-sm font-semibold">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    maxLength={128}
+                    placeholder="Masukkan password"
+                    className={`input w-full pr-10 ${error ? 'input-error' : ''}`}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'login-error' : undefined}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Tampilkan atau sembunyikan password"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-base-content/50 hover:text-base-content"
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    <Icon name={showPassword ? 'visibility_off' : 'visibility'} className="text-[20px]" />
+                  </button>
+                </div>
+                {error && (
+                  <p id="login-error" role="alert" className="flex items-center gap-1.5 pt-1 text-sm font-medium text-error">
+                    <Icon name="error" className="text-[18px]" />
+                    {error}
+                  </p>
+                )}
+              </div>
 
-          <div className="divider my-6 text-xs text-base-content/60">atau coba demo</div>
-          <DemoPanel />
+              <button type="submit" className="btn btn-primary w-full" disabled={submitting || !email || !password}>
+                {submitting ? <span className="loading loading-spinner loading-sm" /> : 'Masuk'}
+              </button>
+              <p className="text-center text-xs text-base-content/70">Lupa password? Hubungi Owner organisasi Anda.</p>
+            </form>
+
+            {demoAvailable && (
+              <div className="order-first lg:order-none">
+                <div className="divider my-6 hidden text-xs text-base-content/60 lg:flex">atau coba demo</div>
+                <div className="mt-6 lg:mt-0">
+                  <DemoPanel />
+                </div>
+                <div className="divider my-6 text-xs text-base-content/60 lg:hidden">atau masuk dengan akun</div>
+              </div>
+            )}
+          </div>
 
           <div className="mt-6 border-t border-base-300 pt-6 text-center text-sm text-base-content/70">
             Belum punya akun?{' '}
