@@ -97,11 +97,13 @@ describe("demo reset", () => {
     await seed();
     await createOrganization("tokolain");
     const before = await count("StockMovements");
+    const organizationsBefore = await count("Organizations");
 
-    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/another organization/);
+    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/organization other than the demo/);
 
     expect(await count("StockMovements")).toBe(before);
-    expect(await count("Organizations")).toBe(2);
+    expect(await count("Organizations")).toBe(organizationsBefore);
+    expect(organizationsBefore).toBe(3);
   });
 
   it("refuses a remote database before touching anything", async () => {

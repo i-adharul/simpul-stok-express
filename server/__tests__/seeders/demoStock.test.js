@@ -94,7 +94,7 @@ describe("demo stock seeder", () => {
   it("moves the organization to the Business plan, so 3 warehouses are within its limits", async () => {
     await seed();
 
-    const [row] = await query(`SELECT p.name, p."maxWarehouses", p."maxProducts" FROM "Subscriptions" s JOIN "Plans" p ON p.id = s."planId"`);
+    const [row] = await query(`SELECT p.name, p."maxWarehouses", p."maxProducts" FROM "Subscriptions" s JOIN "Plans" p ON p.id = s."planId" JOIN "Organizations" o ON o.id = s."organizationId" WHERE o.slug = 'tokomaju'`);
     expect(row.name).toBe("Business");
     expect(row.maxWarehouses).toBeGreaterThanOrEqual(3);
     expect(row.maxProducts).toBeGreaterThanOrEqual(50);
