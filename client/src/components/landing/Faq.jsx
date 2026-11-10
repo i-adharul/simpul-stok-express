@@ -16,7 +16,7 @@ const QUESTIONS = [
   },
   {
     q: 'Siapa yang membuat ini?',
-    a: 'Jawaban akan ditambahkan.',
+    a: 'Simpul Stok dibuat dan dikelola oleh Adharul Imron sebagai proyek portofolio teknis. Kode sumbernya terbuka di GitHub, termasuk tes dan catatan keputusan desainnya.',
   },
 ]
 

@@ -1,6 +1,6 @@
 import { GITHUB_URL, README_URL } from '../../constants/landing'
 
-// The Legal link is added with E13-06. The maintainer fills in the author line.
+// The Legal link is added with E13-06.
 export default function Footer() {
   return (
     <footer className="mt-10 border-t border-base-300 bg-base-100 py-10">
@@ -19,7 +19,7 @@ export default function Footer() {
         </nav>
       </div>
       <p className="mx-auto mt-6 max-w-300 px-4 text-center text-xs text-base-content/60 sm:px-6">
-        Proyek portofolio teknis untuk sistem stok multi-gudang. Data demo bersifat publik dan direset berkala.
+        Dibuat oleh Adharul Imron. Proyek portofolio teknis untuk sistem stok multi-gudang. Data demo bersifat publik dan direset berkala.
       </p>
     </footer>
   )
