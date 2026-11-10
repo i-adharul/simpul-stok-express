@@ -156,12 +156,38 @@ describe("a demo account cannot have its role changed", () => {
   });
 });
 
-describe("what is not refused", () => {
-  it("repeating the current role of a demo account, or only replacing its warehouses, is allowed", async () => {
-    expect((await patchMember(users.DEMO_ADMIN.id, { role: "WAREHOUSE_ADMIN" })).status).toBe(200);
-    expect((await patchMember(users.DEMO_ADMIN.id, { warehouseIds: [] })).status).toBe(200);
+describe("any change to a demo account is refused", () => {
+  it.each([
+    ["repeating its current role", "DEMO_ADMIN", { role: "WAREHOUSE_ADMIN" }],
+    ["replacing only its warehouses", "DEMO_ADMIN", { warehouseIds: [] }],
+    ["replacing only its warehouses (Viewer)", "DEMO_VIEWER", { warehouseIds: [] }],
+    ["repeating the role together with its warehouses", "DEMO_VIEWER", { role: "VIEWER", warehouseIds: [] }],
+  ])("%s (%s): 403, and nothing changes", async (_label, key, body) => {
+    const before = await readUser(users[key].id);
+
+    const res = await patchMember(users[key].id, body);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual(PROTECTED);
+    expect(await readUser(users[key].id)).toEqual(before);
   });
 
+  it("the demo Owner's own row, with a body that changes nothing, is refused too", async () => {
+    const res = await patchMember(users.DEMO_OWNER.id, { warehouseIds: [] });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual(PROTECTED);
+  });
+
+  it("a regular member of the same organization can still have its warehouses replaced", async () => {
+    const res = await patchMember(users.REGULAR_ADMIN.id, { warehouseIds: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.warehouses).toEqual([]);
+  });
+});
+
+describe("what is not refused", () => {
   it("the roles are judged first: a Warehouse Admin gets 403 FORBIDDEN, not the demo code", async () => {
     const res = await patchMember(users.DEMO_VIEWER.id, { isActive: false }, "REGULAR_ADMIN");
 

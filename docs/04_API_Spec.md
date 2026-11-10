@@ -209,7 +209,7 @@ The change applies on the member's next request, because role and status are rea
 | 200 | The updated member, in the shape of one row of `GET /api/members` |
 | 400 | `VALIDATION_ERROR` |
 | 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin; or a warehouse in `warehouseIds` is missing, archived or of another organization (identical answers) |
-| 403 | `DEMO_ACCOUNT_PROTECTED`: the target is a shared demo account (BL31) and the body deactivates it (`isActive: false`) or gives it another role. Checked after the `404` and before the Owner rule, so it also applies when the caller is the demo Owner. A body that only replaces `warehouseIds`, or repeats the current role, is not refused |
+| 403 | `DEMO_ACCOUNT_PROTECTED`: the target is a shared demo account (BL31). Every change is refused, whatever the body holds: deactivating it, another role, the same role again, or only `warehouseIds`. Checked after the `404` and before the Owner rule, so it also applies when the caller is the demo Owner |
 | 409 | `CONFLICT`: the target is the Owner (every change to an Owner is refused, so the last Owner can never be deactivated or demoted) |
 
 ### `POST /api/members/:id/reset-link`
