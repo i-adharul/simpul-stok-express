@@ -32,7 +32,7 @@ Supporting practices: a local Postgres, a separate test database whose name ends
 
 | Item | Why it matters | Decision |
 | --- | --- | --- |
-| Required tests | Protect the product's main claims | At minimum for BL01, BL02, BL03, BL11, BL12, BL13, BL14, BL15 in M1, and BL20, BL21, BL22, BL23 in M2; every other logic item has tests according to its criteria |
+| Required tests | Protect the product's main claims | At minimum for BL01, BL02, BL03, BL11, BL12, BL13, BL14, BL15 in M1, and BL20, BL21, BL22, BL23, BL31 in M2; every other logic item has tests according to its criteria |
 
 ## Registering a new endpoint (tenant isolation)
 

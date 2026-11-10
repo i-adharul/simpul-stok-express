@@ -72,7 +72,7 @@ Everything in this document is one product. Priority only determines the order o
 | Priority          | Contents                                                                                                                                  | Reason                                                                        |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | P0 Core inventory | Login, roles, warehouses, products, receipts, adjustments, transfers, history, concurrency and atomicity tests, deploy                    | The main proof of data integrity; can already be demoed with one organization |
-| P1 SaaS           | Organization sign-up, invitations, tenant isolation, plans and limits, Xendit sandbox billing, webhooks, account freezing, platform admin | Proof of data isolation and the subscription flow                             |
+| P1 SaaS           | Organization sign-up, invitations, tenant isolation, plans and limits, Xendit sandbox billing, webhooks, account freezing, platform admin, one-click demo access, landing page | Proof of data isolation and the subscription flow                             |
 | P2 Extras         | Import and export, low-stock alerts, notifications, audit log, Row-Level Security, PDF reports                                            | Adds depth; cut first                                                         |
 
 All tables use `organizationId` from the start, so P0 runs with one organization and P1 does not need a big migration.
@@ -122,6 +122,7 @@ A product-level summary. The detailed rules for each requirement are in `02_Func
 | FR-22 | Tenant user               | Export stock and history (CSV, XLSX, PDF for stock)                                        | P2       | BL19                   |
 | FR-23 | Owner                     | See the audit trail of important actions                                                   | P2       | BL26; S18              |
 | FR-24 | Tenant user               | A fast dashboard (queries go straight to the database, no cache)                           | P2       | S04                    |
+| FR-25 | Demo visitor              | Open the landing page, then sign in as Owner, Warehouse Admin, or Viewer with one click and no password | P1       | BL31; S01, S24         |
 
 ## 7. Non-functional requirements
 
