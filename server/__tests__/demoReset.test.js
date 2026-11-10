@@ -6,7 +6,7 @@ const { createOrganization } = require("./support/factories");
 const plans = require("../seeders/20261105000100-plans");
 const baseAccounts = require("../seeders/20261105000200-base-accounts");
 const demoStock = require("../seeders/20261108000300-demo-stock");
-const { resetDemo } = require("../helpers/demoReset");
+const { resetDemo, countDemo } = require("../helpers/demoReset");
 
 const NOW = new Date("2026-11-08T05:00:00Z");
 const qi = () => getSequelize().getQueryInterface();
@@ -55,7 +55,7 @@ describe("demo reset", () => {
 
     const result = await resetDemo(getSequelize(), { now: NOW });
 
-    expect(result).toEqual({ reset: true });
+    expect(result).toEqual({ reset: true, counts: { organizations: 2, warehouses: 6, products: 100 } });
     expect(await fingerprint()).toEqual(original);
     expect(await query(`SELECT 1 FROM "Products" WHERE sku = 'JUNK-1'`)).toEqual([]);
     expect(await query(`SELECT 1 FROM "Warehouses" WHERE code = 'GD-JUNK'`)).toEqual([]);
@@ -80,7 +80,7 @@ describe("demo reset", () => {
     await resetDemo(getSequelize(), { now: NOW });
 
     expect(await fingerprint()).toEqual(first);
-    expect(await count("Products")).toBe(50);
+    expect(await count("Products")).toBe(100);
   });
 
   it("keeps the plans, including a price that was changed by hand", async () => {
@@ -97,11 +97,31 @@ describe("demo reset", () => {
     await seed();
     await createOrganization("tokolain");
     const before = await count("StockMovements");
+    const organizationsBefore = await count("Organizations");
 
-    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/another organization/);
+    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/organization other than the demo/);
 
     expect(await count("StockMovements")).toBe(before);
-    expect(await count("Organizations")).toBe(2);
+    expect(await count("Organizations")).toBe(organizationsBefore);
+    expect(organizationsBefore).toBe(3);
+  });
+
+  it("counts organizations, warehouses and products from the rows, not from fixed text", async () => {
+    await seed();
+    expect(await countDemo(getSequelize())).toEqual({ organizations: 2, warehouses: 6, products: 100 });
+
+    const [{ id: organizationId }] = await query(`SELECT id FROM "Organizations" WHERE slug = 'kopisenja'`);
+    await query(`INSERT INTO "Warehouses" ("organizationId", code, name) VALUES (:organizationId, 'KS-X', 'Extra')`, { organizationId });
+
+    expect(await countDemo(getSequelize())).toEqual({ organizations: 2, warehouses: 7, products: 100 });
+  });
+
+  it("allows both demo organizations, and a third one is refused even when it is empty", async () => {
+    await seed();
+    await expect(resetDemo(getSequelize(), { now: NOW })).resolves.toMatchObject({ reset: true });
+
+    await createOrganization("tokolain");
+    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/organization other than the demo/);
   });
 
   it("refuses a remote database before touching anything", async () => {

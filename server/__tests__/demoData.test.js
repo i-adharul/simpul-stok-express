@@ -1,10 +1,9 @@
-const { buildDemoData, WAREHOUSES, PRODUCTS } = require("../helpers/demoData");
+const { buildDemoData } = require("../helpers/demoData");
+const { PROFILES, DEMO_SLUGS, profileOf } = require("../helpers/demoProfiles");
 const { wibDayRange } = require("../helpers/wibDay");
 
 const NOW = new Date("2026-11-08T05:00:00Z"); // 12:00 WIB on 8 Nov 2026
-const demo = buildDemoData(NOW);
-
-const balances = () => {
+const balancesOf = (demo) => {
   const map = new Map();
   for (const m of demo.movements) {
     const key = `${m.warehouseCode}|${m.sku}`;
@@ -13,7 +12,11 @@ const balances = () => {
   return map;
 };
 
-describe("the demo data", () => {
+describe.each(PROFILES.map((profile) => [profile.slug, profile]))("the demo data of %s", (_slug, profile) => {
+  const { warehouses: WAREHOUSES, products: PRODUCTS } = profile;
+  const demo = buildDemoData(NOW, profile);
+  const balances = () => balancesOf(demo);
+
   it("is 3 warehouses and 50 products with valid, unique codes and SKUs", () => {
     expect(WAREHOUSES).toHaveLength(3);
     expect(PRODUCTS).toHaveLength(50);
@@ -29,7 +32,7 @@ describe("the demo data", () => {
   });
 
   it("is the same every time for the same instant", () => {
-    expect(buildDemoData(NOW)).toEqual(demo);
+    expect(buildDemoData(NOW, profile)).toEqual(demo);
   });
 
   it("has a stock level equal to the sum of the movements of its pair, never negative", () => {
@@ -100,9 +103,38 @@ describe("the demo data", () => {
     expect(demo.levels.length).toBeLessThan(150);
     expect(demo.levels.length).toBeGreaterThan(50);
     for (const m of demo.movements) expect(["OWNER", "WAREHOUSE_ADMIN"]).toContain(m.by);
-    // The Warehouse Admin is assigned to these only (see ADMIN_WAREHOUSES), so a movement by them is in one of them.
+    // The Warehouse Admin is assigned to these only (see adminWarehouseCodes), so a movement by them is in one of them.
     for (const m of demo.movements.filter((x) => x.by === "WAREHOUSE_ADMIN")) {
       expect(demo.adminWarehouseCodes).toContain(m.warehouseCode);
     }
+  });
+});
+
+describe("the demo profiles", () => {
+  it("are two businesses with different slugs, names, warehouse codes and SKUs, and the first keeps its seed", () => {
+    expect(DEMO_SLUGS).toEqual(["tokomaju", "kopisenja"]);
+    const [first, second] = PROFILES;
+    expect(first.seed).toBe(20261108);
+    expect(second.name).toBe("Kopi Senja");
+    const codes = (p) => p.warehouses.map((w) => w.code);
+    const skus = (p) => p.products.map((x) => x.sku);
+    expect(codes(first).some((c) => codes(second).includes(c))).toBe(false);
+    expect(skus(first).some((s) => skus(second).includes(s))).toBe(false);
+  });
+
+  it("assign the admin and the viewer only to warehouses that exist in the same profile", () => {
+    for (const p of PROFILES) {
+      const codes = p.warehouses.map((w) => w.code);
+      for (const code of [...p.adminWarehouseCodes, ...p.viewerWarehouseCodes]) expect(codes).toContain(code);
+    }
+  });
+
+  it("make two histories that differ from each other", () => {
+    const [a, b] = PROFILES.map((p) => buildDemoData(NOW, p));
+    expect(a.movements.length).not.toBe(b.movements.length);
+  });
+
+  it("give an error for an unknown slug", () => {
+    expect(() => profileOf("tokolain")).toThrow(/Unknown demo organization/);
   });
 });

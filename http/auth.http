@@ -14,6 +14,13 @@ Content-Type: application/json
 
 { "email": "platform@example.com", "password": "Simpul-Demo-2026" }
 
+### Owner of the second demo organization (Kopi Senja): same call, other data
+# Needs the demo reset: cd server && npm run demo:reset. Expect 200 and a user with the role OWNER.
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{ "email": "owner@kopisenja.example.com", "password": "Simpul-Demo-2026" }
+
 ### Wrong password, unknown email, inactive user, password over 72 bytes: one identical answer
 # Expect 401 {"code":"INVALID_CREDENTIALS","message":"Email atau password salah.","details":null}
 POST http://localhost:3000/api/auth/login

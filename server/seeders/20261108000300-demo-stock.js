@@ -3,12 +3,13 @@
 const crypto = require("crypto");
 const { assertSeedAllowed } = require("../helpers/seedGuard");
 const { buildDemoData } = require("../helpers/demoData");
+const { PROFILES } = require("../helpers/demoProfiles");
 
-// Demo stock for the organization of the base seed ("Toko Maju"): 3 warehouses, 50 products and
-// about three weeks of history (helpers/demoData.js builds it, this file only inserts it). It runs
-// after the plans and the base accounts, which the file name keeps in order. Like them it refuses a
-// remote database (seed guard), because the accounts it logs in with have a public password.
-const ORGANIZATION_SLUG = "tokomaju";
+// Demo stock for each organization of the base seed ("Toko Maju" and "Kopi Senja"): 3 warehouses,
+// 50 products and about three weeks of history each (helpers/demoData.js builds it from the
+// organization's profile, this file only inserts it). It runs after the plans and the base accounts,
+// which the file name keeps in order. Like them it refuses a remote database (seed guard), because
+// the accounts it logs in with have a public password.
 const DEMO_PLAN = "Business"; // Starter allows 2 warehouses; the demo has 3.
 
 const one = async (queryInterface, sql, replacements, transaction) => {
@@ -16,8 +17,8 @@ const one = async (queryInterface, sql, replacements, transaction) => {
   return rows[0];
 };
 
-async function loadOrganization(queryInterface) {
-  const organization = await one(queryInterface, `SELECT "id" FROM "Organizations" WHERE "slug" = :slug`, { slug: ORGANIZATION_SLUG });
+async function loadOrganization(queryInterface, slug) {
+  const organization = await one(queryInterface, `SELECT "id" FROM "Organizations" WHERE "slug" = :slug`, { slug });
   if (!organization) throw new Error("Organization not found: run the base accounts seeder first.");
   return organization.id;
 }
@@ -96,20 +97,32 @@ async function moveToDemoPlan(queryInterface, organizationId, transaction) {
   );
 }
 
-// `now` is the end of the history; the CLI passes the current time, a test passes a fixed instant.
-// Returns true when it seeded, false when the organization already had warehouses.
-async function seedDemo(queryInterface, now = new Date()) {
-  const organizationId = await loadOrganization(queryInterface);
+// One organization: skip it when it already has warehouses, otherwise fill it and move it to
+// Business. Returns true when it seeded.
+async function seedProfile(queryInterface, profile, now) {
+  const organizationId = await loadOrganization(queryInterface, profile.slug);
   if (await alreadySeeded(queryInterface, organizationId)) return false;
   const users = await loadUsers(queryInterface, organizationId);
-  const data = buildDemoData(now);
+  const data = buildDemoData(now, profile);
 
-  // One transaction: a failure in the middle leaves nothing half-seeded (the next run would skip it).
+  // One transaction per organization: a failure in the middle leaves it with nothing half-seeded
+  // (the next run would skip a half-filled one).
   await queryInterface.sequelize.transaction(async (transaction) => {
     await moveToDemoPlan(queryInterface, organizationId, transaction);
     await insertAll(queryInterface, organizationId, users, data, transaction);
   });
   return true;
+}
+
+// `now` is the end of the history; the CLI passes the current time, a test passes a fixed instant.
+// Seeds every demo organization in the order of the profiles. Returns the slugs it seeded (empty
+// when all of them already had warehouses).
+async function seedDemo(queryInterface, now = new Date()) {
+  const seeded = [];
+  for (const profile of PROFILES) {
+    if (await seedProfile(queryInterface, profile, now)) seeded.push(profile.slug);
+  }
+  return seeded;
 }
 
 /** @type {import('sequelize-cli').Migration} */
@@ -120,7 +133,7 @@ module.exports = {
     assertSeedAllowed(queryInterface.sequelize);
     const seeded = await seedDemo(queryInterface);
     // eslint-disable-next-line no-console
-    console.log(seeded ? "Demo stock seeded." : "Demo stock already present: nothing to do (use the reset script to start over).");
+    console.log(seeded.length > 0 ? `Demo stock seeded for: ${seeded.join(", ")}.` : "Demo stock already present: nothing to do (use the reset script to start over).");
   },
 
   // A stock movement cannot be deleted (append-only trigger, ADR 0005), so a seed cannot undo it

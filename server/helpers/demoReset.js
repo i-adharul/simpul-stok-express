@@ -2,6 +2,7 @@ const { assertSeedAllowed } = require("./seedGuard");
 const plans = require("../seeders/20261105000100-plans");
 const baseAccounts = require("../seeders/20261105000200-base-accounts");
 const demoStock = require("../seeders/20261108000300-demo-stock");
+const { DEMO_SLUGS } = require("./demoProfiles");
 
 // Puts the demo back as the seeds made it (S: "reset the demo"). Everything of the demo
 // organization goes, and the three seeders run again, so a visitor's changes, new users and even a
@@ -9,10 +10,9 @@ const demoStock = require("../seeders/20261108000300-demo-stock");
 //
 // Why TRUNCATE and not DELETE: a stock movement cannot be deleted (append-only trigger, ADR 0005),
 // so the only way to empty that table is TRUNCATE, which empties it for every organization. That is
-// why this refuses to run when another organization exists: it is for a database that holds the
+// why this refuses to run when an organization other than the two demo ones exists: it is for a database that holds the
 // demo and nothing else. One TRUNCATE statement names all tables, because Postgres refuses to
 // empty a table that another table still references unless both go in the same statement.
-const ORGANIZATION_SLUG = "tokomaju";
 const TABLES = [
   "Notifications",
   "AuditLogs",
@@ -33,10 +33,21 @@ const TABLES = [
 ];
 
 async function assertOnlyDemoOrganization(sequelize) {
-  const [rows] = await sequelize.query(`SELECT 1 FROM "Organizations" WHERE "slug" <> :slug LIMIT 1`, { replacements: { slug: ORGANIZATION_SLUG } });
+  const [rows] = await sequelize.query(`SELECT 1 FROM "Organizations" WHERE "slug" NOT IN (:slugs) LIMIT 1`, { replacements: { slugs: DEMO_SLUGS } });
   if (rows.length > 0) {
-    throw new Error("Refusing to reset: another organization exists, and TRUNCATE would delete its data too.");
+    throw new Error("Refusing to reset: an organization other than the demo ones exists, and TRUNCATE would delete its data too.");
   }
+}
+
+// What the database holds now, counted from the rows (never fixed text), so the script's summary is
+// a real check: "2 organizations, 6 warehouses, 100 products" only if that is what is there.
+async function countDemo(sequelize) {
+  const [[row]] = await sequelize.query(
+    `SELECT (SELECT count(*) FROM "Organizations") AS organizations,
+            (SELECT count(*) FROM "Warehouses") AS warehouses,
+            (SELECT count(*) FROM "Products") AS products`,
+  );
+  return { organizations: Number(row.organizations), warehouses: Number(row.warehouses), products: Number(row.products) };
 }
 
 // `now` is the end of the restored history (the CLI passes the current time). The seed guard runs
@@ -52,7 +63,7 @@ async function resetDemo(sequelize, { now = new Date() } = {}) {
   await plans.up(queryInterface);
   await baseAccounts.up(queryInterface);
   await demoStock.seedDemo(queryInterface, now);
-  return { reset: true };
+  return { reset: true, counts: await countDemo(sequelize) };
 }
 
-module.exports = { resetDemo, TABLES };
+module.exports = { resetDemo, countDemo, TABLES };
