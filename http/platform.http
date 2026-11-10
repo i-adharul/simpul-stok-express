@@ -1,0 +1,17 @@
+### Platform admin: sign in first with http/auth.http as the Platform admin account (login answers redirectTo "/platform") and paste the token.
+### List every organization (Platform admin only)
+# Expect 200 {"items":[{"id","name","slug","status","plan","currentPeriodEnd","createdAt"}],"total","page","pageSize"}.
+# Newest first. status is the stored value (TRIAL stays TRIAL; the screen shows it as "Aktif"). plan and currentPeriodEnd are null without a subscription. No stock data.
+GET http://localhost:3000/api/platform/organizations?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Unknown query key or pageSize above 100: 400 VALIDATION_ERROR
+GET http://localhost:3000/api/platform/organizations?pageSize=101
+Authorization: Bearer {{token}}
+
+### Owner, Warehouse Admin or Viewer token: 403 FORBIDDEN (before the query is looked at)
+GET http://localhost:3000/api/platform/organizations
+Authorization: Bearer {{token}}
+
+### No token: 401 UNAUTHENTICATED
+GET http://localhost:3000/api/platform/organizations

@@ -58,7 +58,7 @@ Public. Body: `{ "email": string (1-254), "password": string (1-128) }`. Only th
 
 | Status | Body |
 | ------ | ---- |
-| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }`, or `"/platform"` for `PLATFORM_ADMIN` |
+| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }`, or `"/platform"` for `PLATFORM_ADMIN` (the client opens S19, `/platform/organizations`, for it) |
 | 400 | `VALIDATION_ERROR` (missing field, wrong shape, or body is not JSON) |
 | 401 | `{ "code": "INVALID_CREDENTIALS", "message": "Email atau password salah.", "details": null }` (unknown email, wrong password, inactive user, or password over 72 bytes: one identical answer) |
 
@@ -509,6 +509,19 @@ Every tenant role. No query, no cache: each call reads the database. `totalProdu
 | Status | Body                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 200    | `{ "summary": { "totalProducts", "totalUnits", "lowCount", "outCount", "movementsToday" }, "restock": { "items": [{ "warehouse": { "id", "code", "name" }, "product": { "id", "sku", "name", "unit", "minStock" }, "quantity", "status": "OUT" \| "LOW" }], "total" }, "recentActivity": [{ "id", "type", "quantityDelta", "reason", "createdAt", "warehouse": { "id", "code", "name" }, "product": { "id", "sku", "name", "unit" }, "createdBy": { "id", "name" } \| null, "transfer": { "id", "code" } \| null }] }`. `restock.items` holds at most 5 pairs, the furthest below `minStock` first; `recentActivity` holds the 5 newest movements. |
+
+## Platform (S19, BL25)
+
+Every `/api/platform/*` route is for the platform admin only. No token is `401 UNAUTHENTICATED`; an Owner, Warehouse Admin or Viewer gets `403 FORBIDDEN` before the query, the body or an ID is looked at. A platform admin has no organization, so these routes read across tenants on purpose, and they never return stock data.
+
+### `GET /api/platform/organizations`
+
+Query: `page` (default 1) and `pageSize` (1 to 100, default 20); other keys are `400`. Lists every organization, newest first (`createdAt` descending, then `id`), trial and suspended ones included.
+
+| Status | Body |
+| ------ | ---- |
+| 200    | `{ "items": [{ "id", "name", "slug", "status", "plan", "currentPeriodEnd", "createdAt" }], "total", "page", "pageSize" }`. `status` is the stored `Organization.status` as is (`TRIAL`, `ACTIVE`, `PAST_DUE` or `SUSPENDED`); the UI shows `TRIAL` as "Aktif" (BL25). `plan` is the plan name and `currentPeriodEnd` the end of the current period in UTC; both are `null` for an organization without a subscription. No stock, user or invoice data |
+| 400    | `VALIDATION_ERROR`: an unknown query key or a `page` or `pageSize` outside its range |
 
 ## System
 

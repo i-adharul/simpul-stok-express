@@ -27,8 +27,11 @@ const PUBLIC_ROUTES = {
 // Platform admin routes (/api/platform/*): they read across tenants on purpose through
 // helpers/platformAccess.js, so the harness cannot swap an organization's ID for a foreign one.
 // Their rule is the opposite one: only a Platform admin may call them, a tenant role gets 403 and no
-// token gets 401 (proven for every label by platformRoutes.test.js). Empty until E11-03 adds the
-// first one; each label needs a written reason, like the other lists.
-const PLATFORM_ROUTES = {};
+// token gets 401 (proven for every label by platformBoundary.test.js). Each label needs a written
+// reason, like the other lists.
+const PLATFORM_ROUTES = {
+  "GET /platform/organizations":
+    "Lists every organization on purpose (BL25), through helpers/platformAccess.js; there is no organization ID in the request to swap, and the answer holds no stock data.",
+};
 
 module.exports = { EXEMPT_ROUTES, PUBLIC_ROUTES, PLATFORM_ROUTES };
