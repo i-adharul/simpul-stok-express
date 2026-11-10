@@ -109,6 +109,16 @@ The token is judged first (an invalid one is `404` whatever the password is), th
 | 400 | `VALIDATION_ERROR` (shape, or the reason the password is refused in `message` with `details: [{ "source": "body", "path": "password", "message" }]`) |
 | 404 | `NOT_FOUND`, identical to `GET /api/auth/reset-password/:token`: the token is malformed, unknown, replaced, used or expired, or the member is no longer active |
 
+### `POST /api/auth/demo-login`
+
+Public, and only active when the environment variable `DEMO_MODE` is `true` (off by default; BL31). Signs a visitor in as one of three shared demo accounts without a password, so the product can be tried with one click. Body: `{ "role": "OWNER" | "WAREHOUSE_ADMIN" | "VIEWER" }`. Any other value, including `PLATFORM_ADMIN`, a missing `role`, an unknown key or a body that is not JSON, is a `400`. The accounts are found by their email in configuration (`DEMO_OWNER_EMAIL`, `DEMO_ADMIN_EMAIL`, `DEMO_VIEWER_EMAIL`), never from the request; the platform admin and any email outside that list can never be signed in this way. The token is a normal one (same shape and lifetime as login: 8 hours, `sub`, `iat`, `exp`), so every protected endpoint treats it like a token from `POST /api/auth/login`. Like login, it is not blocked by the subscription state (BL23).
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }` (the same shape as login) |
+| 400 | `VALIDATION_ERROR` (`role` missing, not one of the three values, an unknown key, or the body is not JSON) |
+| 404 | `NOT_FOUND`: `DEMO_MODE` is off (the same body as any unknown route, so a production server does not announce a demo door), or the configured account does not exist or is inactive (an inactive account is never signed in) |
+
 ### `POST /api/auth/logout`
 
 Any caller, with or without a token; no body. Always `204` with no body. The server keeps no session, so nothing is revoked on the server: the client deletes its token. A token stays valid until it expires or until the password changes.
