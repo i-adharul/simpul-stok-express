@@ -65,7 +65,7 @@ The harness is proven by a self-test (`harness.selftest.test.js`): a correctly s
 
 ## Member and invitation rules: what proves each one (BL05 to BL07)
 
-The audit of E7-10 (step 1). Files are under `server/__tests__/`. "Closed by" names the step of the same story that adds the missing proof. The plan member limit on accept is proven in E8-02 (`planLimits.enforce.test.js`), not here.
+The audit of E7-10 (step 1). Files are under `server/__tests__/`. A row marked "Was missing" names the test file that now closes it. The plan member limit on accept is proven in E8-02 (`planLimits.enforce.test.js`), not here.
 
 | Rule | Proof |
 | --- | --- |
@@ -84,7 +84,7 @@ The audit of E7-10 (step 1). Files are under `server/__tests__/`. "Closed by" na
 | BL06 a cancel and an acceptance cannot both win (invitation row lock, apart from the organization lock) | `e7.tokenGaps.test.js` (added by this audit) |
 | BL07 role change only to Warehouse Admin or Viewer; the Owner role cannot be granted | `members.update.test.js` ("400 for the role OWNER"); `invitations.test.js` ("400 for the role OWNER") |
 | BL07 the Owner cannot be deactivated or demoted | `members.update.test.js`, "the Owner is protected" |
-| BL07 every organization keeps exactly one active Owner after any series of operations | **Missing.** Closed by step 2 (`ownerInvariant.test.js`) |
+| BL07 every organization keeps exactly one active Owner after any series of operations | Was missing. Closed by `ownerInvariant.test.js` |
 | BL07 deactivation cuts access at once (token 401, login 401) and a role change applies at once | `members.update.test.js`, "the change applies at once" |
 | BL07 reset link: hash only, valid 1 day, one link per member (a new one cancels the old) | `members.reset.test.js` |
 | BL07 reset link only for active members | `members.reset.test.js` ("an inactive member is 409") |
@@ -93,6 +93,6 @@ The audit of E7-10 (step 1). Files are under `server/__tests__/`. "Closed by" na
 | BL07 an expired link, and the link of a deactivated member, are refused on POST too | **Was missing** (only GET was proven). `e7.tokenGaps.test.js` (added by this audit) |
 | Sign-up creates the organization with one Owner; duplicate email or slug gives 409, also simultaneously | `auth.registerOrganization.test.js` |
 | Role and 401 for every E7 endpoint with an ID or a list (`/members`, `/members/:id`, `/members/:id/reset-link`, `/invitations`, `/invitations/:id`) | Registry entries, run by `roleMatrix.test.js` and `crossTenant.test.js`. Foreign IDs and foreign `warehouseIds` are checked there too |
-| `GET /organization` and `PATCH /organization` for every role | Only partly: `organization.isolation.test.js` has Platform admin 403, no token 401 and the Warehouse Admin and Viewer 403 on PATCH. **Missing:** one table-driven test from the permission table. Closed by step 3 |
-| Foreign IDs on `invitations/:id` and `members/:id`, foreign `warehouseIds`, lists without rows of another organization | Covered entry by entry by the harness. **Missing:** one explicit test over all E7 entries. Closed by step 4 |
-| The E7 concurrency tests are stable | **Not yet measured.** Closed by step 5 |
+| `GET /organization` and `PATCH /organization` for every role | Only partly: `organization.isolation.test.js` has Platform admin 403, no token 401 and the Warehouse Admin and Viewer 403 on PATCH. Was missing: one table-driven test from the permission table. Closed by `e7.roleMatrix.test.js` |
+| Foreign IDs on `invitations/:id` and `members/:id`, foreign `warehouseIds`, lists without rows of another organization | Covered entry by entry by the harness. Was missing: one explicit test over all E7 entries. Closed by `e7.tenant.test.js` |
+| The E7 concurrency tests are stable | Run 20 times in a row (`auth.registerOrganization`, `invitations.accept`, `members.reset`, `e7.tokenGaps`, `members.update.concurrency`, one Jest process each time, `--runInBand`) on 2026-11-10: 20 of 20 runs green, 70 tests each, no flaky run |
