@@ -46,12 +46,11 @@ export default function ChangeMemberAccessModal({ member, warehouses, onSaved, o
           <div className="join w-full">
             {ROLES.map((r) => (
               <label key={r.value} className={`btn join-item flex-1 ${role === r.value ? 'btn-primary btn-soft' : ''}`}>
-                <input type="radio" name="member-role" className="hidden" checked={role === r.value} disabled={member.isDemo} onChange={() => setRole(r.value)} />
+                <input type="radio" name="member-role" className="hidden" checked={role === r.value} onChange={() => setRole(r.value)} />
                 {r.label}
               </label>
             ))}
           </div>
-          {member.isDemo && <p className="text-xs text-base-content/70">Peran akun demo tidak dapat diubah. Akses gudang tetap bisa diatur.</p>}
         </fieldset>
         <fieldset className="space-y-1.5">
           <legend className="text-sm font-semibold">Akses lokasi gudang</legend>
