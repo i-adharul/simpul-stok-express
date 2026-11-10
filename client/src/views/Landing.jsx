@@ -1,8 +1,18 @@
-// S24 Landing page. The sections are added step by step (E15-05).
+import Features from '../components/landing/Features'
+import Hero from '../components/landing/Hero'
+import HowItWorks from '../components/landing/HowItWorks'
+import ProofStrip from '../components/landing/ProofStrip'
+import Problem from '../components/landing/Problem'
+
+// S24 Landing page. The demo, "Di balik layar", pricing, FAQ and footer sections come in later steps.
 export default function Landing() {
   return (
-    <section className="mx-auto max-w-300 px-4 py-16 sm:px-6">
-      <h1 className="text-4xl font-extrabold tracking-tight">Semua cabang, satu simpul.</h1>
-    </section>
+    <>
+      <Hero />
+      <ProofStrip />
+      <Problem />
+      <Features />
+      <HowItWorks />
+    </>
   )
 }
