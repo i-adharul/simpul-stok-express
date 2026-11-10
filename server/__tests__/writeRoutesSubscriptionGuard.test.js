@@ -14,6 +14,8 @@ const ALLOWED_WITHOUT_GUARD = [
   "POST /auth/register-organization",
   // BL06: the person has no session yet; the token in the body is the proof.
   "POST /auth/accept-invite",
+  // BL07: the member has no session yet; the token in the body is the proof.
+  "POST /auth/reset-password",
   "PATCH /me/password",
 ];
 

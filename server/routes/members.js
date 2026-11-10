@@ -2,9 +2,15 @@ const express = require("express");
 const memberController = require("../controllers/memberController");
 const authentication = require("../middlewares/authentication");
 const { requireCan } = require("../middlewares/authorization");
+const noStore = require("../middlewares/noStore");
 const subscriptionGuard = require("../middlewares/subscriptionGuard");
 const validate = require("../middlewares/validate");
-const { memberListQuerySchema, updateMemberSchema } = require("../schemas/member.schema");
+const {
+  memberIdParamsSchema,
+  memberListQuerySchema,
+  resetLinkBodySchema,
+  updateMemberSchema,
+} = require("../schemas/member.schema");
 
 const router = express.Router();
 
@@ -26,6 +32,18 @@ router.patch(
   subscriptionGuard,
   validate({ body: updateMemberSchema }),
   memberController.update,
+);
+
+// The answer holds the raw reset token (once), so it must never be cached. Same order as above: role (403
+// first), subscription (rule 17), then validate.
+router.post(
+  "/members/:id/reset-link",
+  noStore,
+  authentication,
+  requireCan("member.manage"),
+  subscriptionGuard,
+  validate({ params: memberIdParamsSchema, body: resetLinkBodySchema }),
+  memberController.createResetLink,
 );
 
 module.exports = router;

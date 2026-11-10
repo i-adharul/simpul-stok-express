@@ -7,13 +7,13 @@
 | Audience | People who build endpoints, clients, and API tests                                                                                                                       |
 | Related  | The rules for each endpoint are in `02_Functional_Spec.md` (BL); the error format is in BL29; the documentation is run through one `.http` file per resource in the repo |
 
-## REST endpoint list (53)
+## REST endpoint list (54)
 
 REST through Express is the only path between the client and the server. Every action, read or write, uses these endpoints. All endpoints follow BL02, BL03, and BL29, are validated with Zod, and return JSON.
 
 | Resource                        | Endpoints                                                                                                                                                                                                                               | Role                                                                                                                                                                                     |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth (7)                        | `POST /api/auth/login`, `POST /api/auth/register-organization`, `POST /api/auth/accept-invite`, `POST /api/auth/reset-password`, `POST /api/auth/logout`, `GET /api/me`, `PATCH /api/me/password`                                       | The first four are public (accept-invite and reset-password use a token); the rest are for any logged-in user                                                                            |
+| Auth (8)                        | `POST /api/auth/login`, `POST /api/auth/register-organization`, `POST /api/auth/accept-invite`, `GET /api/auth/reset-password/:token`, `POST /api/auth/reset-password`, `POST /api/auth/logout`, `GET /api/me`, `PATCH /api/me/password`                                       | The first five are public (accept-invite and reset-password use a token); logout answers anyone; the rest are for any logged-in user                                                                            |
 | Organization (2)                | `GET /api/organization`, `PATCH /api/organization`                                                                                                                                                                                      | Read: every tenant user; update: Owner                                                                                                                                                   |
 | Members and invitations (7)     | `GET /api/members`, `PATCH /api/members/:id`, `POST /api/members/:id/reset-link`, `GET /api/invitations`, `POST /api/invitations`, `DELETE /api/invitations/:id`, `GET /api/invitations/:token`                                         | Owner; the last one is public with a token                                                                                                                                               |
 | Warehouses (6)                  | `GET /api/warehouses`, `POST /api/warehouses`, `GET /api/warehouses/:id`, `PATCH /api/warehouses/:id`, `GET /api/warehouses/:id/members`, `PUT /api/warehouses/:id/members`                                                             | Read according to assigned warehouses; write: Owner                                                                                                                                      |
@@ -87,6 +87,27 @@ In one transaction that locks the invitation row (`SELECT ... FOR UPDATE`) and j
 | 403 | `PLAN_LIMIT_REACHED` (BL20): the member limit is checked again inside the transaction, under the organization lock, for a new member and for a reactivated one; the invitation stays usable. `details: { "resource": "MEMBER", "limit", "used" }`; nothing is written |
 | 404 | `NOT_FOUND`, identical to `GET /api/invitations/:token`: the token is malformed, unknown, expired or already used |
 | 409 | `CONFLICT`: the email now belongs to an active user, to a user of another organization, or to an Owner |
+
+### `GET /api/auth/reset-password/:token`
+
+Public (no token in the header: the token in the URL is the proof) and not subject to the subscription check. It exists so the reset view (S03) can show the email read-only before the member chooses a password (BL07). The raw token is hashed and looked up. A malformed, unknown, replaced (a newer link was made), used or expired token, and the token of a member who is no longer active, are one identical answer, so the response never says which.
+
+| Status | Body |
+| ------ | ---- |
+| 200 | `{ "email" }` |
+| 404 | `{ "code": "NOT_FOUND", "message": "Data tidak ditemukan.", "details": null }` |
+
+### `POST /api/auth/reset-password`
+
+Public (the token in the body is the proof) and not subject to the subscription check. Body, both required and unknown keys rejected: `{ "token": string (1-200), "password": string (1-128) }`. The password rules of BL01 apply, and the password may not equal the member's email or the part before the `@`. No token is returned: the member signs in through `POST /api/auth/login`.
+
+The token is judged first (an invalid one is `404` whatever the password is), then the password rules. In one transaction the server reads the user again by the token hash with `SELECT ... FOR UPDATE` and judges the link again, then replaces the password hash, sets `passwordChangedAt` (every token that member held earlier gets `401`) and clears the reset columns (the link is single-use). Of two simultaneous uses of one link exactly one succeeds.
+
+| Status | Body |
+| ------ | ---- |
+| 204 | no body |
+| 400 | `VALIDATION_ERROR` (shape, or the reason the password is refused in `message` with `details: [{ "source": "body", "path": "password", "message" }]`) |
+| 404 | `NOT_FOUND`, identical to `GET /api/auth/reset-password/:token`: the token is malformed, unknown, replaced, used or expired, or the member is no longer active |
 
 ### `POST /api/auth/logout`
 
@@ -177,6 +198,17 @@ The change applies on the member's next request, because role and status are rea
 | 400 | `VALIDATION_ERROR` |
 | 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin; or a warehouse in `warehouseIds` is missing, archived or of another organization (identical answers) |
 | 409 | `CONFLICT`: the target is the Owner (every change to an Owner is refused, so the last Owner can never be deactivated or demoted) |
+
+### `POST /api/members/:id/reset-link`
+
+Owner only (`member.manage`; other roles get `403` before the ID is looked at). No body (an empty object is accepted, any key is `400`). Creates a one-time password reset link for **another active member** of the organization (BL07). The token is 32 random bytes in base64url; only its SHA-256 hash and the expiry (now + 1 day) are stored. The member row is locked, and the new hash overwrites the old one, so creating a new link cancels the previous link at once. The response carries `Cache-Control: no-store`.
+
+| Status | Body |
+| ------ | ---- |
+| 201 | `{ "token", "expiresAt" }`. This is the only response that ever holds the raw token; no response holds the stored hash. The client builds the link `/reset/<token>` |
+| 400 | `VALIDATION_ERROR` (the body has a key) |
+| 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin (one identical answer) |
+| 409 | `CONFLICT`: the target is the Owner (the caller) or an inactive member |
 
 ### `POST /api/invitations`
 

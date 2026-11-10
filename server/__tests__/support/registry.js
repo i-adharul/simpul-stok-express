@@ -356,6 +356,11 @@ const TENANT_ENDPOINTS = [
     ],
     ...member,
   },
+  // Reset link (E7-09): the row in the URL is a user of the organization (a Viewer, never the Owner). B's
+  // member is answered like a random UUID (404) and its reset columns stay untouched. No body, no
+  // foreign body key. Kind "item" with post: the ID in the URL is the row, and the link is written on
+  // that row (a "create" entry has no ID in its path).
+  { method: "post", path: "/api/members/:id/reset-link", kind: "item", action: "member.manage", ...member },
   // Invitations (E7-04). The harness cannot see the token, only the rows: A's list must never show
   // B's invitation, B's invitation cannot be cancelled by A, and a warehouse of B in the body is
   // answered exactly like a random UUID (404).
@@ -456,7 +461,6 @@ function validateEntry(entry) {
   if (entry.kind !== "item" && hasId) problems.push('only an item entry may have ":id" in its path');
   if (entry.kind === "list" && entry.method !== "get") problems.push("a list entry must use get");
   if (entry.kind === "create" && entry.method !== "post") problems.push("a create entry must use post");
-  if (entry.kind === "item" && entry.method === "post") problems.push("an item entry cannot use post");
   if (entry.supportsCursor && entry.kind !== "list") problems.push("supportsCursor only fits a list entry");
   if ((entry.kind === "create" || entry.idempotent) && typeof entry.countRows !== "function") {
     problems.push("countRows is required for a create entry and for an idempotent one");

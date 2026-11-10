@@ -97,7 +97,6 @@ describe("validateEntry", () => {
     [{ kind: "list", method: "get" }, /only an item entry may have/],
     [{ kind: "list", path: "/api/things", method: "post" }, /list entry must use get/],
     [{ kind: "create", path: "/api/things", method: "get", countRows: async () => 0 }, /create entry must use post/],
-    [{ method: "post" }, /cannot use post/],
     [{ supportsCursor: true }, /supportsCursor/],
     [{ kind: "create", method: "post", path: "/api/things" }, /countRows/],
     [{ method: "get", idempotent: true, countRows: async () => 0 }, /cannot be idempotent/],
@@ -106,6 +105,10 @@ describe("validateEntry", () => {
     [{ warehouseScoped: {} }, /warehouseScoped/],
   ])("rejects %p", (extra, message) => {
     expect(validateEntry(valid(extra)).join(" | ")).toMatch(message);
+  });
+
+  it("accepts an item entry that uses post (an action on one row, like a reset link)", () => {
+    expect(validateEntry(valid({ method: "post" }))).toEqual([]);
   });
 
   it("reports every fault at once", () => {

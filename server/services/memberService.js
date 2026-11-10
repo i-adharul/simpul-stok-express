@@ -2,6 +2,7 @@ const { Op, literal } = require("sequelize");
 const { conflict, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
+const { generateToken, hashToken } = require("../helpers/token");
 const { inTransaction } = require("../helpers/transaction");
 const { tenant } = require("../helpers/tenantScope");
 const { getEffectiveLimits, getUsage } = require("./planLimitService");
@@ -116,4 +117,26 @@ function update(ctx, id, body) {
   });
 }
 
-module.exports = { list, update, toMember };
+const RESET_VALID_DAYS = 1;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// BL07. The Owner creates a one-time password reset link for another ACTIVE member. The member is found
+// like any row of the organization (malformed, missing, foreign and Platform admin IDs are the same 404)
+// and the row is locked, so two links created at the same moment run one after the other and the last
+// one wins. The Owner (the caller, the only Owner) and an inactive member are a 409. Writing the new
+// hash and expiry over the old ones cancels the old link at once. Only the hash is stored; the raw token
+// is returned here and nowhere else.
+function createResetLink(ctx, id) {
+  return inTransaction(async (transaction) => {
+    const target = await findOwned(ctx, "User", id, { transaction, lock: transaction.LOCK.UPDATE });
+    if (target.role === "OWNER" || target.id === ctx.userId) throw conflict("Tautan reset tidak dapat dibuat untuk pemilik.");
+    if (!target.isActive) throw conflict("Tautan reset hanya untuk anggota yang aktif.");
+
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + RESET_VALID_DAYS * DAY_MS);
+    await target.update({ resetTokenHash: hashToken(token), resetExpiresAt: expiresAt }, { transaction });
+    return { token, expiresAt };
+  });
+}
+
+module.exports = { list, update, createResetLink, toMember };

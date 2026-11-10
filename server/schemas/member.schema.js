@@ -27,4 +27,10 @@ const updateMemberSchema = z
     when: (payload) => payload.issues.length === 0,
   });
 
-module.exports = { memberListQuerySchema, updateMemberSchema };
+// BL07. The ID is only checked to be present: a malformed one is a 404 from findOwned, not a 400 (rule 2).
+// The reset link has no body at all; the empty schema (unknown keys are rejected by validate()) only
+// satisfies rule 4 and refuses a client that sends fields it thinks matter.
+const memberIdParamsSchema = z.object({ id: z.string() });
+const resetLinkBodySchema = z.object({});
+
+module.exports = { memberListQuerySchema, updateMemberSchema, memberIdParamsSchema, resetLinkBodySchema };

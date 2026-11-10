@@ -46,4 +46,18 @@ const acceptInviteSchema = z.object({
   password: z.string().min(1).max(128),
 });
 
-module.exports = { loginSchema, changePasswordSchema, registerOrganizationSchema, acceptInviteSchema };
+// BL07. Only the shape, like accept-invite: the email the password may not equal is not known until the
+// token is looked up, so the password rules (helpers/password.js) are applied by the service. Every
+// invalid token is the same 404 (docs/04), so its length is only capped. Neither field is trimmed.
+const resetPasswordSchema = z.object({
+  token: z.string().min(1).max(200),
+  password: z.string().min(1).max(128),
+});
+
+module.exports = {
+  loginSchema,
+  changePasswordSchema,
+  registerOrganizationSchema,
+  acceptInviteSchema,
+  resetPasswordSchema,
+};

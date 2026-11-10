@@ -9,4 +9,9 @@ async function update(req, res) {
   res.status(200).json(await memberService.update(req.ctx, req.params.id, req.valid.body));
 }
 
-module.exports = { list, update };
+// The only place the raw reset token leaves the server (BL07): the Owner copies the link from this response.
+async function createResetLink(req, res) {
+  res.status(201).json(await memberService.createResetLink(req.ctx, req.params.id));
+}
+
+module.exports = { list, update, createResetLink };
