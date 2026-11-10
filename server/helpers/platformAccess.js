@@ -5,10 +5,21 @@ const { Organization } = require("../models");
 // routes are behind requirePlatformAdmin, which runs before any of these calls. Tenant routes must
 // never import this file (a static test checks it). Keep it small: every function here sees all tenants.
 
-// One page of organizations, newest first. `limit` and `offset` come from validated pagination.
+// One page of organizations, newest first, each with its subscription and plan name (the include is
+// a left join: an organization without a subscription is still listed). `limit` and `offset` come
+// from validated pagination. The associations are named, so no other model is imported here.
 const findOrganizations = ({ limit, offset }) =>
   Organization.findAndCountAll({
     attributes: ["id", "name", "slug", "status", "createdAt"],
+    include: [
+      {
+        association: "Subscription",
+        attributes: ["currentPeriodEnd"],
+        required: false,
+        include: [{ association: "Plan", attributes: ["name"] }],
+      },
+    ],
+    distinct: true,
     order: [["createdAt", "DESC"], ["id", "ASC"]],
     limit,
     offset,
