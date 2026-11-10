@@ -5,10 +5,10 @@ const db = require("../models");
 const { resetDemo } = require("../helpers/demoReset");
 
 async function main() {
-  await resetDemo(db.sequelize);
-  // Only the host is printed: the connection URL holds the password.
+  const { counts } = await resetDemo(db.sequelize);
+  // Only the host is printed: the connection URL holds the password. The numbers come from the rows.
   // eslint-disable-next-line no-console
-  console.log(`Demo reset on host "${db.sequelize.config.host}": 3 warehouses, 50 products and the demo accounts restored.`);
+  console.log(`Demo reset on host "${db.sequelize.config.host}": ${counts.organizations} organizations, ${counts.warehouses} warehouses and ${counts.products} products restored.`);
 }
 
 main()

@@ -39,6 +39,17 @@ async function assertOnlyDemoOrganization(sequelize) {
   }
 }
 
+// What the database holds now, counted from the rows (never fixed text), so the script's summary is
+// a real check: "2 organizations, 6 warehouses, 100 products" only if that is what is there.
+async function countDemo(sequelize) {
+  const [[row]] = await sequelize.query(
+    `SELECT (SELECT count(*) FROM "Organizations") AS organizations,
+            (SELECT count(*) FROM "Warehouses") AS warehouses,
+            (SELECT count(*) FROM "Products") AS products`,
+  );
+  return { organizations: Number(row.organizations), warehouses: Number(row.warehouses), products: Number(row.products) };
+}
+
 // `now` is the end of the restored history (the CLI passes the current time). The seed guard runs
 // first, so a remote database is refused before anything is read or written. A failure after the
 // TRUNCATE leaves an empty demo: run the reset again.
@@ -52,7 +63,7 @@ async function resetDemo(sequelize, { now = new Date() } = {}) {
   await plans.up(queryInterface);
   await baseAccounts.up(queryInterface);
   await demoStock.seedDemo(queryInterface, now);
-  return { reset: true };
+  return { reset: true, counts: await countDemo(sequelize) };
 }
 
-module.exports = { resetDemo, TABLES };
+module.exports = { resetDemo, countDemo, TABLES };
