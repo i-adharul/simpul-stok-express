@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Daily demo reset on the EC2 host (ADR 0017). Started by crontab, never by the API:
-#   0 20 * * * /home/ubuntu/simpul-stok-express/server/scripts/resetDemoCron.sh >> /home/ubuntu/logs/demo-reset.log 2>&1
+#   0 20 * * * /srv/simpul-stok/server/scripts/resetDemoCron.sh >> /home/ubuntu/logs/demo-reset.log 2>&1
 # 20:00 UTC is 03:00 WIB. The credential of the reset role is read from a file outside the repository
 # and outside server/.env (default ~/.simpul-reset.env, override with DEMO_RESET_ENV_FILE), so the API
 # process never holds it. The file holds DEMO_RESET_DATABASE_URL, SEED_ALLOW_REMOTE=true, SEED_PASSWORD
