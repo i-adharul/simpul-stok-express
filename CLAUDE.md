@@ -37,7 +37,7 @@ server/
   migrations/  models/  seeders/
   routes/        index.js + one file per resource
   controllers/   thin: read the request, call a service or tenant data access, reply
-  services/      auth, stock, transfer, idempotency (billing and planLimit in M2)
+  services/      auth, stock, transfer, idempotency, invitation, member, organization, passwordReset, planLimit (billing in M2)
   schemas/       Zod schemas per resource
   middlewares/   authentication, authorization, validate, idempotencyKey,
                  subscriptionGuard, requestLogger, errorHandler

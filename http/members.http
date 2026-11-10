@@ -30,3 +30,12 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "role": "OWNER" }
+
+### Create a password reset link for another active member (Owner only). Use an "id" from GET /api/members.
+# Expect 201 {"token","expiresAt"} and Cache-Control: no-store. The token appears only here; the client builds /reset/<token>.
+# A new link cancels the previous one. The Owner or an inactive member gives 409; a body key gives 400; another organization's ID gives 404.
+POST http://localhost:3000/api/members/00000000-0000-4000-8000-000000000000/reset-link
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
