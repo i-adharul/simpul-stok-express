@@ -80,7 +80,7 @@ describe("demo reset", () => {
     await resetDemo(getSequelize(), { now: NOW });
 
     expect(await fingerprint()).toEqual(first);
-    expect(await count("Products")).toBe(50);
+    expect(await count("Products")).toBe(100);
   });
 
   it("keeps the plans, including a price that was changed by hand", async () => {

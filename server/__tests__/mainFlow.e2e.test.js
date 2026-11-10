@@ -117,7 +117,7 @@ describe("main flow, end to end", () => {
 
   it("5. transfers 10 units from the source to the destination as the next transfer code", async () => {
     const body = { fromWarehouseId: source, toWarehouseId: destination, items: [{ productId: product.id, quantity: 10 }], note: "E2E" };
-    const seededTransfers = Number((await sql(`SELECT count(*) AS n FROM "StockTransfers"`))[0].n);
+    const seededTransfers = Number((await sql(`SELECT count(*) AS n FROM "StockTransfers" t JOIN "Organizations" o ON o.id = t."organizationId" WHERE o.slug = 'tokomaju'`))[0].n);
 
     const res = await transfer(owner, body, transferKey);
     const replay = await transfer(owner, body, transferKey);

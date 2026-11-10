@@ -22,24 +22,37 @@ describe("demo stock seeder", () => {
   beforeEach(() => clearTables(getSequelize()));
   afterAll(() => clearTables(getSequelize()));
 
-  it("fills the demo organization with 3 warehouses, 50 products, stock and history", async () => {
+  const orgCount = async (table, slug, where = "") =>
+    Number((await query(`SELECT count(*) AS n FROM "${table}" t JOIN "Organizations" o ON o.id = t."organizationId" WHERE o.slug = :slug ${where}`, { slug }))[0].n);
+
+  it.each(["tokomaju", "kopisenja"])("fills %s with 3 warehouses, 50 products, stock and history", async (slug) => {
     await seed();
 
-    expect(await query(`SELECT code FROM "Warehouses" ORDER BY code`)).toHaveLength(3);
-    expect(Number((await query(`SELECT count(*) AS n FROM "Products" WHERE "archivedAt" IS NULL`))[0].n)).toBe(50);
-    expect(Number((await query(`SELECT count(*) AS n FROM "StockLevels"`))[0].n)).toBeGreaterThan(50);
-    expect(Number((await query(`SELECT count(*) AS n FROM "StockMovements"`))[0].n)).toBeGreaterThan(150);
-    expect(Number((await query(`SELECT count(*) AS n FROM "StockTransfers"`))[0].n)).toBeGreaterThanOrEqual(5);
+    expect(await orgCount("Warehouses", slug)).toBe(3);
+    expect(await orgCount("Products", slug, 'AND t."archivedAt" IS NULL')).toBe(50);
+    expect(await orgCount("StockLevels", slug)).toBeGreaterThan(50);
+    expect(await orgCount("StockMovements", slug)).toBeGreaterThan(150);
+    expect(await orgCount("StockTransfers", slug)).toBeGreaterThanOrEqual(5);
   });
 
-  it("puts every row in the organization of the base seed", async () => {
+  it("puts every row in one of the two demo organizations and mixes none of them", async () => {
     await seed();
-    const [{ id }] = await query(`SELECT id FROM "Organizations" WHERE slug = 'tokomaju'`);
+    const orgs = await query(`SELECT id, slug FROM "Organizations" ORDER BY slug`);
 
     for (const table of ["Warehouses", "Products", "StockLevels", "StockMovements", "StockTransfers", "UserWarehouses"]) {
       const rows = await query(`SELECT DISTINCT "organizationId" FROM "${table}"`);
-      expect(rows).toEqual([{ organizationId: id }]);
+      expect(rows.map((r) => r.organizationId).sort()).toEqual(orgs.map((o) => o.id).sort());
     }
+    // A stock level and a movement point at a warehouse and a product of their own organization.
+    for (const table of ["StockLevels", "StockMovements"]) {
+      const mixed = await query(
+        `SELECT 1 FROM "${table}" t JOIN "Warehouses" w ON w.id = t."warehouseId" JOIN "Products" p ON p.id = t."productId"
+         WHERE w."organizationId" <> t."organizationId" OR p."organizationId" <> t."organizationId"`,
+      );
+      expect(mixed).toEqual([]);
+    }
+    const codes = await query(`SELECT w.code FROM "Warehouses" w JOIN "Organizations" o ON o.id = w."organizationId" WHERE o.slug = 'kopisenja' ORDER BY w.code`);
+    expect(codes.map((c) => c.code)).toEqual(["KS-BDG", "KS-DGO", "KS-LBG"]);
   });
 
   it("keeps every stock level equal to the sum of its movements (the database CHECK is never needed)", async () => {
@@ -70,13 +83,18 @@ describe("demo stock seeder", () => {
     expect(unbalanced).toEqual([]);
   });
 
-  it("assigns the Warehouse Admin to two warehouses and the Viewer to one, and records real users as authors", async () => {
+  it("assigns each Warehouse Admin to two warehouses and each Viewer to one, and records real users as authors", async () => {
     await seed();
 
     const assigned = await query(
-      `SELECT u.role, count(*) AS n FROM "UserWarehouses" uw JOIN "Users" u ON u.id = uw."userId" GROUP BY u.role ORDER BY u.role`,
+      `SELECT o.slug, u.role, count(*) AS n FROM "UserWarehouses" uw JOIN "Users" u ON u.id = uw."userId" JOIN "Organizations" o ON o.id = uw."organizationId" GROUP BY o.slug, u.role ORDER BY o.slug, u.role`,
     );
-    expect(assigned.map((r) => [r.role, Number(r.n)]).sort()).toEqual([["VIEWER", 1], ["WAREHOUSE_ADMIN", 2]]);
+    expect(assigned.map((r) => [r.slug, r.role, Number(r.n)]).sort()).toEqual([
+      ["kopisenja", "VIEWER", 1],
+      ["kopisenja", "WAREHOUSE_ADMIN", 2],
+      ["tokomaju", "VIEWER", 1],
+      ["tokomaju", "WAREHOUSE_ADMIN", 2],
+    ]);
     const authors = await query(`SELECT DISTINCT u.role FROM "StockMovements" m JOIN "Users" u ON u.id = m."createdById" ORDER BY u.role`);
     expect(authors.map((a) => a.role).sort()).toEqual(["OWNER", "WAREHOUSE_ADMIN"]);
     expect(await query(`SELECT 1 FROM "StockMovements" WHERE "createdById" IS NULL`)).toEqual([]);
@@ -91,13 +109,34 @@ describe("demo stock seeder", () => {
     expect(await query(`SELECT 1 FROM "StockMovements" WHERE "createdAt" > :now`, { now: NOW })).toEqual([]);
   });
 
-  it("moves the organization to the Business plan, so 3 warehouses are within its limits", async () => {
+  it("moves each organization to the Business plan, so 3 warehouses are within its limits", async () => {
     await seed();
 
-    const [row] = await query(`SELECT p.name, p."maxWarehouses", p."maxProducts" FROM "Subscriptions" s JOIN "Plans" p ON p.id = s."planId" JOIN "Organizations" o ON o.id = s."organizationId" WHERE o.slug = 'tokomaju'`);
-    expect(row.name).toBe("Business");
-    expect(row.maxWarehouses).toBeGreaterThanOrEqual(3);
-    expect(row.maxProducts).toBeGreaterThanOrEqual(50);
+    const rows = await query(`SELECT p.name, p."maxWarehouses", p."maxProducts" FROM "Subscriptions" s JOIN "Plans" p ON p.id = s."planId"`);
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.name).toBe("Business");
+      expect(row.maxWarehouses).toBeGreaterThanOrEqual(3);
+      expect(row.maxProducts).toBeGreaterThanOrEqual(50);
+    }
+  });
+
+  it("returns the slugs it seeded, and nothing when everything is already filled", async () => {
+    await plans.up(qi());
+    await baseAccounts.up(qi());
+
+    expect(await demoStock.seedDemo(qi(), NOW)).toEqual(["tokomaju", "kopisenja"]);
+    expect(await demoStock.seedDemo(qi(), NOW)).toEqual([]);
+  });
+
+  it("fills only the organization that is still empty", async () => {
+    await plans.up(qi());
+    await baseAccounts.up(qi());
+    const [{ id }] = await query(`SELECT id FROM "Organizations" WHERE slug = 'tokomaju'`);
+    await query(`INSERT INTO "Warehouses" ("organizationId", code, name) VALUES (:id, 'GD-X', 'Existing')`, { id });
+
+    expect(await demoStock.seedDemo(qi(), NOW)).toEqual(["kopisenja"]);
+    expect(await orgCount("Warehouses", "tokomaju")).toBe(1);
   });
 
   it("can run twice without adding anything", async () => {
