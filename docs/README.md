@@ -19,6 +19,7 @@ The product UI is in Indonesian, and these documents are written in English. Tex
 | [04_API_Spec.md](04_API_Spec.md)                            | The 53 REST endpoints, who may call them, the conventions, and the contract of each one    | You build or test an endpoint       |
 | [05_Technical_Design.md](05_Technical_Design.md)            | Tech stack, architecture, and security decisions, with the alternatives that were rejected | You review the system               |
 | [06_Test_Plan.md](06_Test_Plan.md)                          | Which tests prove the main claims and how to write them                                    | You write or run tests              |
+| [07_Demo_Reset_Runbook.md](07_Demo_Reset_Runbook.md)           | How the daily demo reset is set up, run and checked on production                          | You operate the demo server         |
 
 ## Reading order
 
