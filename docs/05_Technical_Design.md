@@ -116,7 +116,7 @@ Verify the token before reading the body. Store a `WebhookEvent` with a unique k
 
 **6. Basic security that must exist**
 
-- `bcryptjs` with cost 12 (so a password is at most 72 characters). The JWT is valid for 8 hours with no extension.
+- `bcryptjs` with cost 12 (so a password is at most 72 characters). The JWT is valid for 8 hours with no extension. Tests hash passwords with cost 4 (Jest only); production uses 12.
 - All input is validated with Zod on the server. A write route must declare a schema (kept by a static test).
 - Secrets (`JWT_SECRET`, the database URL, the cron secret, the Xendit keys) live only in environment variables. `config/env.js` parses them with the Zod schema in `config/envSchema.js` and refuses to start if one is missing or invalid.
 - **Security headers and CORS:** `helmet`, and CORS with a list of allowed origins from `CORS_ORIGIN` (no wildcard).

@@ -22,7 +22,7 @@ Only the stock module is built. HR and POS modules are ideas, never scaffold the
 | ORM and migrations | Sequelize 6 with `sequelize-cli` (migrations, seeders). Raw SQL only for locks, triggers and conditional updates |
 | Validation | Zod |
 | Auth | JWT bearer in the `Authorization` header, `bcryptjs`, `jsonwebtoken`. Token kept in `localStorage` by the client |
-| Tests | Jest 30 and Supertest, real Postgres, `--runInBand` |
+| Tests | Jest 30 and Supertest, real Postgres, `--runInBand`, Tests hash passwords with cost 4 (Jest only); production uses 12 |
 | Client | React 19, Vite, Tailwind, daisyUI, axios, react-router, a small `AuthContext`. No Redux |
 | Deploy | API on EC2 (`pm2`, Nginx, Let's Encrypt) at https://simpulstok-api.adharul.my.id; client on Vercel at https://simpulstok.adharul.my.id; database on Supabase. Live since M1 |
 
@@ -82,8 +82,9 @@ Every rule has a test or a static check where possible. Do not weaken a test to 
 cd server
 npm run dev                          # start with nodemon
 npm test                             # all tests, one file at a time (--runInBand)
-npx jest path/to/file.test.js        # one file
-npx jest -t "test name"              # one test
+npx jest --runInBand path/to/file.test.js        # one file
+npx jest --runInBand -t "test name"              # one test
+# Always --runInBand: there is one test database and every file empties its tables. Parallel runs fail with foreign key errors.
 npx sequelize db:migrate             # apply migrations (dev database)
 npx sequelize db:migrate:undo:all    # roll everything back
 npx sequelize db:seed:all             # base seed (remote needs SEED_ALLOW_REMOTE=true and a strong SEED_PASSWORD; on production seed plans and base-accounts one by one with --seed)
