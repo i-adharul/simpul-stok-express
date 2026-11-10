@@ -58,7 +58,7 @@ Public. Body: `{ "email": string (1-254), "password": string (1-128) }`. Only th
 
 | Status | Body |
 | ------ | ---- |
-| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }`, or `"/platform"` for `PLATFORM_ADMIN` |
+| 200 | `{ "token", "user": { "id", "name", "email", "role" }, "redirectTo": "/dashboard" }`, or `"/platform"` for `PLATFORM_ADMIN` (the client opens S19, `/platform/organizations`, for it) |
 | 400 | `VALIDATION_ERROR` (missing field, wrong shape, or body is not JSON) |
 | 401 | `{ "code": "INVALID_CREDENTIALS", "message": "Email atau password salah.", "details": null }` (unknown email, wrong password, inactive user, or password over 72 bytes: one identical answer) |
 
