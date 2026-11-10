@@ -7,6 +7,7 @@ const ERROR_CODES = Object.freeze({
   FORBIDDEN: "FORBIDDEN",
   PLAN_LIMIT_REACHED: "PLAN_LIMIT_REACHED",
   SUBSCRIPTION_READ_ONLY: "SUBSCRIPTION_READ_ONLY",
+  DEMO_ACCOUNT_PROTECTED: "DEMO_ACCOUNT_PROTECTED",
   NOT_FOUND: "NOT_FOUND",
   CONFLICT: "CONFLICT",
   INSUFFICIENT_STOCK: "INSUFFICIENT_STOCK",
@@ -23,6 +24,7 @@ const STATUS_BY_CODE = Object.freeze({
   FORBIDDEN: 403,
   PLAN_LIMIT_REACHED: 403,
   SUBSCRIPTION_READ_ONLY: 403,
+  DEMO_ACCOUNT_PROTECTED: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
   INSUFFICIENT_STOCK: 409,
@@ -71,6 +73,10 @@ const subscriptionReadOnly = (
   message = "Langganan Anda sedang dalam mode baca saja.",
 ) => new AppError(ERROR_CODES.SUBSCRIPTION_READ_ONLY, message);
 
+// BL31. A shared demo account may not be locked out, re-keyed or demoted: every visitor uses it.
+const demoAccountProtected = (message = "Akun demo tidak dapat diubah.") =>
+  new AppError(ERROR_CODES.DEMO_ACCOUNT_PROTECTED, message);
+
 const notFound = (message = "Data tidak ditemukan.") =>
   new AppError(ERROR_CODES.NOT_FOUND, message);
 
@@ -101,6 +107,7 @@ module.exports = {
   forbidden,
   planLimitReached,
   subscriptionReadOnly,
+  demoAccountProtected,
   notFound,
   conflict,
   insufficientStock,

@@ -3,10 +3,11 @@ const errors = require("../helpers/errors");
 const { AppError, ERROR_CODES } = errors;
 
 describe("error codes", () => {
-  it("are exactly the 12 documented codes", () => {
+  it("are exactly the 13 documented codes", () => {
     expect(Object.values(ERROR_CODES).sort()).toEqual(
       [
         "CONFLICT",
+        "DEMO_ACCOUNT_PROTECTED",
         "FORBIDDEN",
         "INSUFFICIENT_STOCK",
         "INTERNAL_ERROR",
@@ -63,6 +64,7 @@ describe("status mapping", () => {
     ["FORBIDDEN", 403],
     ["PLAN_LIMIT_REACHED", 403],
     ["SUBSCRIPTION_READ_ONLY", 403],
+    ["DEMO_ACCOUNT_PROTECTED", 403],
     ["NOT_FOUND", 404],
     ["CONFLICT", 409],
     ["INSUFFICIENT_STOCK", 409],
@@ -94,6 +96,7 @@ describe("builders", () => {
     ["forbidden", "FORBIDDEN"],
     ["planLimitReached", "PLAN_LIMIT_REACHED"],
     ["subscriptionReadOnly", "SUBSCRIPTION_READ_ONLY"],
+    ["demoAccountProtected", "DEMO_ACCOUNT_PROTECTED"],
     ["notFound", "NOT_FOUND"],
     ["conflict", "CONFLICT"],
     ["internalError", "INTERNAL_ERROR"],

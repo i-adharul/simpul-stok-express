@@ -143,6 +143,7 @@ Any logged-in user, in every subscription state (BL23). Body: `{ "currentPasswor
 | 400 | `VALIDATION_ERROR` (missing field, wrong shape, or body is not JSON) |
 | 400 | `VALIDATION_ERROR` with the reason the new password is refused in `message`, and `details: [{ "source": "body", "path": "newPassword", "message" }]` |
 | 401 | `UNAUTHENTICATED`, as for `GET /api/me` |
+| 403 | `DEMO_ACCOUNT_PROTECTED`: the caller is one of the shared demo accounts (BL31). Checked before the current password is verified |
 
 ## Error codes
 
@@ -157,6 +158,7 @@ Every error body is `{ code, message, details }` (BL29), with no stack trace. `m
 | `FORBIDDEN`                | 403    | The role may not do this, the warehouse is outside the caller's reach, or the caller is a platform admin on a tenant endpoint.                                                |
 | `PLAN_LIMIT_REACHED`       | 403    | Creating or restoring a warehouse or product, inviting a member, or accepting an invitation would exceed the plan limit (BL20). `details: { "resource": "WAREHOUSE" \| "PRODUCT" \| "MEMBER", "limit", "used" }`. |
 | `SUBSCRIPTION_READ_ONLY`   | 403    | Defined for a read-only subscription; no endpoint returns it yet (E8).                                                                                                        |
+| `DEMO_ACCOUNT_PROTECTED`   | 403    | A shared demo account (BL31, only while `DEMO_MODE` is on) cannot change its password, receive a reset link, be deactivated or have its role changed, whoever the caller is (the demo Owner included). Message: "Akun demo tidak dapat diubah." |
 | `NOT_FOUND`                | 404    | Missing, or belongs to another organization (one identical body, rule 2).                                                                                                     |
 | `CONFLICT`                 | 409    | The request is valid but the current state refuses it (duplicate code or SKU, archived target, stock still present, quantity limit).                                          |
 | `INSUFFICIENT_STOCK`       | 409    | A transfer needs more than the source holds; `details: { "productId" }`.                                                                                                      |
@@ -207,6 +209,7 @@ The change applies on the member's next request, because role and status are rea
 | 200 | The updated member, in the shape of one row of `GET /api/members` |
 | 400 | `VALIDATION_ERROR` |
 | 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin; or a warehouse in `warehouseIds` is missing, archived or of another organization (identical answers) |
+| 403 | `DEMO_ACCOUNT_PROTECTED`: the target is a shared demo account (BL31) and the body deactivates it (`isActive: false`) or gives it another role. Checked after the `404` and before the Owner rule, so it also applies when the caller is the demo Owner. A body that only replaces `warehouseIds`, or repeats the current role, is not refused |
 | 409 | `CONFLICT`: the target is the Owner (every change to an Owner is refused, so the last Owner can never be deactivated or demoted) |
 
 ### `POST /api/members/:id/reset-link`
@@ -218,6 +221,7 @@ Owner only (`member.manage`; other roles get `403` before the ID is looked at). 
 | 201 | `{ "token", "expiresAt" }`. This is the only response that ever holds the raw token; no response holds the stored hash. The client builds the link `/reset/<token>` |
 | 400 | `VALIDATION_ERROR` (the body has a key) |
 | 404 | `NOT_FOUND`: the ID is malformed, missing, of another organization or of a platform admin (one identical answer) |
+| 403 | `DEMO_ACCOUNT_PROTECTED`: the target is a shared demo account (BL31); also when the caller is the demo Owner. Checked after the `404` and before the `409` rules |
 | 409 | `CONFLICT`: the target is the Owner (the caller) or an inactive member |
 
 ### `POST /api/invitations`

@@ -9,6 +9,7 @@ const {
   unauthenticated,
   validationError,
 } = require("../helpers/errors");
+const { assertNotDemoAccount } = require("../helpers/demoAccounts");
 const invitationAccess = require("../helpers/invitationAccess");
 const { signToken } = require("../helpers/jwt");
 const { validatePassword } = require("../helpers/password");
@@ -87,6 +88,8 @@ async function changePassword(userId, { currentPassword, newPassword }) {
   const user = await findUserWithPasswordHash(userId);
   // Deleted between the authentication check and here: treat it like any lost session.
   if (!user) throw unauthenticated();
+  // BL31: a shared demo account keeps its password. Checked before bcrypt, so it is also cheap.
+  assertNotDemoAccount(user);
 
   if (!(await comparePassword(currentPassword, user.passwordHash))) {
     throw invalidCurrentPassword();

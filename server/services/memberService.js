@@ -1,5 +1,6 @@
 const { Op, literal } = require("sequelize");
-const { conflict, notFound } = require("../helpers/errors");
+const { assertNotDemoAccount, isDemoAccount } = require("../helpers/demoAccounts");
+const { conflict, demoAccountProtected, notFound } = require("../helpers/errors");
 const { findOwned } = require("../helpers/ownership");
 const { pageBody, pageWindow } = require("../helpers/pagination");
 const { generateToken, hashToken } = require("../helpers/token");
@@ -97,6 +98,14 @@ async function replaceAssignment(ctx, userId, warehouseIds, transaction) {
   }
 }
 
+// BL31. A demo account cannot be deactivated or given another role, by anyone (the demo Owner included).
+// Only a real change counts: the same role again, or a new assignment of warehouses, is allowed.
+function assertDemoChangeAllowed(target, body) {
+  const deactivates = body.isActive === false;
+  const changesRole = body.role !== undefined && body.role !== target.role;
+  if ((deactivates || changesRole) && isDemoAccount(target.email)) throw demoAccountProtected();
+}
+
 // BL07. The member is found like any row of the organization (a malformed, missing or foreign ID is
 // the same 404; a Platform admin has no organization, so it is never found) and the row is locked, so
 // two changes of one member run one after the other. The Owner is protected: every change to an Owner
@@ -106,6 +115,9 @@ async function replaceAssignment(ctx, userId, warehouseIds, transaction) {
 function update(ctx, id, body) {
   return inTransaction(async (transaction) => {
     const target = await findOwned(ctx, "User", id, { transaction, lock: transaction.LOCK.UPDATE });
+    // After the 404 (a foreign ID stays a 404, rule 2) and before the Owner rule, so a demo Owner is
+    // answered as a demo account.
+    assertDemoChangeAllowed(target, body);
     if (target.role === "OWNER") throw conflict("Pemilik tidak dapat diubah atau dinonaktifkan.");
 
     const { warehouseIds, ...fields } = body;
@@ -129,6 +141,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function createResetLink(ctx, id) {
   return inTransaction(async (transaction) => {
     const target = await findOwned(ctx, "User", id, { transaction, lock: transaction.LOCK.UPDATE });
+    assertNotDemoAccount(target); // BL31: no reset link for a shared demo account
     if (target.role === "OWNER" || target.id === ctx.userId) throw conflict("Tautan reset tidak dapat dibuat untuk pemilik.");
     if (!target.isActive) throw conflict("Tautan reset hanya untuk anggota yang aktif.");
 
