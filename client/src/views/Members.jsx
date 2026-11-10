@@ -31,8 +31,10 @@ function ListState({ list, emptyMessage, children }) {
   return children
 }
 
-// Kebab menu of a row. The Owner row and an inactive member have no actions.
+// Kebab menu of a row. The Owner row and an inactive member have no actions. A demo account row has only a
+// note (BL31): PATCH, reset link and deactivation are all refused with 403 for it.
 function RowActions({ member, onEdit, onResetLink, onDeactivate }) {
+  if (member.isDemo) return <span className="text-xs text-base-content/60">Akun demo dilindungi</span>
   if (member.role === 'OWNER' || !member.isActive) return null
   const pick = (action) => () => {
     document.activeElement?.blur()
@@ -47,17 +49,12 @@ function RowActions({ member, onEdit, onResetLink, onDeactivate }) {
         <li>
           <button type="button" onClick={pick(onEdit)}>Ubah akses</button>
         </li>
-        {/* BL31: a shared demo account gets no reset link and cannot be deactivated. */}
-        {!member.isDemo && (
-          <>
-            <li>
-              <button type="button" onClick={pick(onResetLink)}>Buat tautan reset</button>
-            </li>
-            <li>
-              <button type="button" className="text-error" onClick={pick(onDeactivate)}>Nonaktifkan</button>
-            </li>
-          </>
-        )}
+        <li>
+          <button type="button" onClick={pick(onResetLink)}>Buat tautan reset</button>
+        </li>
+        <li>
+          <button type="button" className="text-error" onClick={pick(onDeactivate)}>Nonaktifkan</button>
+        </li>
       </ul>
     </div>
   )
@@ -161,7 +158,7 @@ export default function Members() {
   // { token, email } while P08 shows a reset link; dropped on close so the token is gone.
   const [resetLink, setResetLink] = useState(null)
   const [cancellingId, setCancellingId] = useState(null)
-  const [editing, setEditing] = useState(null) // member row for P09
+  const [editing, setEditing] = useState(null) // member row for P09 (never a demo account, BL31)
   const [deactivating, setDeactivating] = useState(null) // member row for P10
 
   function handleMemberChanged(message) {
@@ -225,7 +222,7 @@ export default function Members() {
       <section className="space-y-3">
         <h2 className="font-bold">Anggota{members.data ? ` (${members.data.total})` : ''}</h2>
         <ListState list={members} emptyMessage="Belum ada anggota.">
-          <MembersTable list={members} activeCount={activeCount} onEdit={setEditing} onResetLink={createResetLink} onDeactivate={setDeactivating} />
+          <MembersTable list={members} activeCount={activeCount} onEdit={(member) => !member.isDemo && setEditing(member)} onResetLink={createResetLink} onDeactivate={setDeactivating} />
         </ListState>
       </section>
 
