@@ -55,7 +55,7 @@ describe("demo reset", () => {
 
     const result = await resetDemo(getSequelize(), { now: NOW });
 
-    expect(result).toEqual({ reset: true, counts: { organizations: 2, warehouses: 6, products: 100 } });
+    expect(result).toEqual({ reset: true, wipedOrganizations: 0, counts: { organizations: 2, warehouses: 6, products: 100 } });
     expect(await fingerprint()).toEqual(original);
     expect(await query(`SELECT 1 FROM "Products" WHERE sku = 'JUNK-1'`)).toEqual([]);
     expect(await query(`SELECT 1 FROM "Warehouses" WHERE code = 'GD-JUNK'`)).toEqual([]);
@@ -99,7 +99,7 @@ describe("demo reset", () => {
     const before = await count("StockMovements");
     const organizationsBefore = await count("Organizations");
 
-    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/organization other than the demo/);
+    await expect(resetDemo(getSequelize(), { now: NOW, wipeOthers: false })).rejects.toThrow(/DEMO_RESET_WIPE_OTHERS/);
 
     expect(await count("StockMovements")).toBe(before);
     expect(await count("Organizations")).toBe(organizationsBefore);
@@ -121,7 +121,27 @@ describe("demo reset", () => {
     await expect(resetDemo(getSequelize(), { now: NOW })).resolves.toMatchObject({ reset: true });
 
     await createOrganization("tokolain");
-    await expect(resetDemo(getSequelize(), { now: NOW })).rejects.toThrow(/organization other than the demo/);
+    await expect(resetDemo(getSequelize(), { now: NOW, wipeOthers: false })).rejects.toThrow(/organization other than the demo/);
+  });
+
+  it("deletes the sign-up organizations, and says how many, only when the wipe switch is on", async () => {
+    await seed();
+    await createOrganization("tokolain");
+    await createOrganization("tokobaru");
+    expect(await count("Organizations")).toBe(4);
+
+    const result = await resetDemo(getSequelize(), { now: NOW, wipeOthers: true });
+
+    expect(result).toEqual({ reset: true, wipedOrganizations: 2, counts: { organizations: 2, warehouses: 6, products: 100 } });
+    expect(await query(`SELECT 1 FROM "Organizations" WHERE slug IN ('tokolain', 'tokobaru')`)).toEqual([]);
+  });
+
+  it("keeps the switch off unless it is exactly true (the default is off)", async () => {
+    await seed();
+    await createOrganization("tokolain");
+
+    await expect(resetDemo(getSequelize(), { now: NOW, wipeOthers: undefined })).rejects.toThrow(/DEMO_RESET_WIPE_OTHERS/);
+    expect(await count("Organizations")).toBe(3);
   });
 
   it("refuses a remote database before touching anything", async () => {
@@ -130,6 +150,8 @@ describe("demo reset", () => {
     const before = await count("StockMovements");
 
     await expect(resetDemo(remote, { now: NOW })).rejects.toThrow(/Refusing to seed/);
+    // The wipe switch does not replace the remote guard (it comes first, before anything is read).
+    await expect(resetDemo(remote, { now: NOW, wipeOthers: true })).rejects.toThrow(/Refusing to seed/);
 
     expect(await count("StockMovements")).toBe(before);
     await remote.close();
