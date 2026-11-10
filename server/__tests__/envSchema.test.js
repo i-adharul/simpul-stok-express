@@ -152,3 +152,53 @@ describe("parseEnv: production deploy variables", () => {
     );
   });
 });
+
+describe("parseEnv demo mode", () => {
+  const demo = {
+    ...valid,
+    DEMO_MODE: "true",
+    DEMO_OWNER_EMAIL: "owner@example.com",
+    DEMO_ADMIN_EMAIL: "admin@example.com",
+    DEMO_VIEWER_EMAIL: "viewer@example.com",
+  };
+
+  it("is off by default, with no demo emails", () => {
+    const env = parseEnv(valid);
+
+    expect(env.DEMO_MODE).toBe(false);
+    expect([env.DEMO_OWNER_EMAIL, env.DEMO_ADMIN_EMAIL, env.DEMO_VIEWER_EMAIL]).toEqual([null, null, null]);
+  });
+
+  it("stays off, and needs no emails, when DEMO_MODE is false", () => {
+    expect(parseEnv({ ...valid, DEMO_MODE: "false" }).DEMO_MODE).toBe(false);
+  });
+
+  it("refuses a DEMO_MODE value that is not true or false", () => {
+    expect(() => parseEnv({ ...valid, DEMO_MODE: "yes" })).toThrow("DEMO_MODE");
+  });
+
+  it("reads the three emails trimmed and in lowercase when it is on", () => {
+    const env = parseEnv({ ...demo, DEMO_OWNER_EMAIL: "  Owner@Example.com " });
+
+    expect(env.DEMO_MODE).toBe(true);
+    expect(env.DEMO_OWNER_EMAIL).toBe("owner@example.com");
+  });
+
+  it.each(["DEMO_OWNER_EMAIL", "DEMO_ADMIN_EMAIL", "DEMO_VIEWER_EMAIL"])("throws when %s is missing while DEMO_MODE is true", (key) => {
+    const source = { ...demo };
+    delete source[key];
+
+    expect(() => parseEnv(source)).toThrow(key);
+  });
+
+  it("throws for an email that is not an email address, naming the variable and not the value", () => {
+    const attempt = () => parseEnv({ ...demo, DEMO_ADMIN_EMAIL: "not-an-email" });
+
+    expect(attempt).toThrow("DEMO_ADMIN_EMAIL");
+    expect(attempt).not.toThrow("not-an-email");
+  });
+
+  it("throws when two roles share one account", () => {
+    expect(() => parseEnv({ ...demo, DEMO_VIEWER_EMAIL: "OWNER@example.com" })).toThrow(/must be different/);
+  });
+});

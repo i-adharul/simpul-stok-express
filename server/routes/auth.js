@@ -1,10 +1,12 @@
 const express = require("express");
 const authController = require("../controllers/authController");
 const organizationController = require("../controllers/organizationController");
+const demoMode = require("../middlewares/demoMode");
 const noStore = require("../middlewares/noStore");
 const validate = require("../middlewares/validate");
 const {
   acceptInviteSchema,
+  demoLoginSchema,
   loginSchema,
   registerOrganizationSchema,
   resetPasswordSchema,
@@ -16,6 +18,10 @@ router.use("/auth", noStore);
 
 // Public: no token yet. No subscription check either (login must work in every state, BL23).
 router.post("/auth/login", validate({ body: loginSchema }), authController.login);
+
+// Public (BL31, ADR 0016): the visitor has no password. demoMode answers 404 when DEMO_MODE is off, before
+// the body is validated. No subscription check, like login: a demo account must be reachable in any state.
+router.post("/auth/demo-login", demoMode, validate({ body: demoLoginSchema }), authController.demoLogin);
 
 // Public: no organization exists yet (BL04). No subscription check either: the organization is created
 // here, so there is nothing to check (and a new customer must always be able to sign up).

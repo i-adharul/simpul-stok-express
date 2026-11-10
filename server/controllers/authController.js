@@ -8,6 +8,12 @@ async function login(req, res) {
   res.status(200).json(result);
 }
 
+// Public, and only while DEMO_MODE is on (the demoMode middleware answers 404 before this). 200 like login.
+async function demoLogin(req, res) {
+  const result = await authService.demoLogin(req.valid.body);
+  res.status(200).json(result);
+}
+
 // Public: the token in the body is the proof. 200 like login, so the new member lands on the dashboard.
 async function acceptInvite(req, res) {
   const result = await authService.acceptInvite(req.valid.body);
@@ -31,4 +37,4 @@ function logout(req, res) {
   res.status(204).end();
 }
 
-module.exports = { login, acceptInvite, showResetPassword, resetPassword, logout };
+module.exports = { login, demoLogin, acceptInvite, showResetPassword, resetPassword, logout };

@@ -2,6 +2,11 @@ const { z } = require("zod");
 const { validatePassword } = require("../helpers/password");
 const { organizationNameSchema, slugSchema } = require("./organization.schema");
 
+// BL31. The caller names a ROLE, never an email: the service picks the account from the configured
+// list. PLATFORM_ADMIN is not in the enum on purpose, so it is a 400 like any other unknown value.
+const DEMO_ROLES = ["OWNER", "WAREHOUSE_ADMIN", "VIEWER"];
+const demoLoginSchema = z.object({ role: z.enum(DEMO_ROLES) });
+
 // Only the shape is checked at login (docs/04): the real test is the password hash. The email
 // is trimmed and lowercased here, once, so the service can look it up as it is. The password is
 // never trimmed: spaces are part of it.
@@ -55,6 +60,8 @@ const resetPasswordSchema = z.object({
 });
 
 module.exports = {
+  DEMO_ROLES,
+  demoLoginSchema,
   loginSchema,
   changePasswordSchema,
   registerOrganizationSchema,
