@@ -53,6 +53,7 @@ const toMember = (user, warehouses) => ({
   email: user.email,
   role: user.role,
   isActive: user.isActive,
+  isDemo: isDemoAccount(user.email), // BL31: the app hides the refused actions
   lastLoginAt: user.lastLoginAt,
   allWarehouses: user.role === "OWNER",
   warehouses: user.role === "OWNER" ? [] : warehouses,

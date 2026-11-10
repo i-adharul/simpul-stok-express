@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
+import DemoBanner from '../components/DemoBanner'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { useAuth } from '../context/authContext'
 import { ROLE_LABELS, visibleNav } from '../constants/navigation'
@@ -82,6 +83,7 @@ export default function BaseLayout() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {user.isDemo && <DemoBanner />}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-base-300 bg-base-100 px-4">
           <button aria-label="Buka menu" className="btn btn-ghost btn-sm btn-square lg:hidden" onClick={() => setOpen(true)}>
             <Icon name="menu" />

@@ -81,6 +81,7 @@ describe("PATCH /api/members/:id: the change applies at once", () => {
       email: "viewer-a@example.com",
       role: "WAREHOUSE_ADMIN",
       isActive: true,
+      isDemo: false,
       lastLoginAt: null,
       allWarehouses: false,
       warehouses: [{ id: w1, code: "GD-1" }],

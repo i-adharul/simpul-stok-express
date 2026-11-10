@@ -1,11 +1,12 @@
 const authService = require("../services/authService");
+const { isDemoAccount } = require("../helpers/demoAccounts");
 
 // req.user comes from the authentication middleware and already holds the organization (loaded in
 // the same query). Only the documented fields are copied, so nothing else can leak by accident.
 function getMe(req, res) {
   const { id, name, email, role, Organization: organization } = req.user;
   res.status(200).json({
-    user: { id, name, email, role },
+    user: { id, name, email, role, isDemo: isDemoAccount(email) }, // BL31: the app shows the "Mode demo" banner
     organization: organization
       ? {
           id: organization.id,

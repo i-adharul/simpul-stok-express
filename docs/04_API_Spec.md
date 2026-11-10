@@ -129,7 +129,7 @@ Any logged-in user.
 
 | Status | Body |
 | ------ | ---- |
-| 200 | `{ "user": { "id", "name", "email", "role" }, "organization": { "id", "name", "slug", "status" } \| null }` (`organization` is `null` for a platform admin) |
+| 200 | `{ "user": { "id", "name", "email", "role", "isDemo" }, "organization": { "id", "name", "slug", "status" } \| null }` (`organization` is `null` for a platform admin). `isDemo` is `true` for a shared demo account (BL31, only while `DEMO_MODE` is on), so the app can show the "Mode demo" banner |
 | 401 | `{ "code": "UNAUTHENTICATED", "message": "Sesi tidak valid. Silakan masuk lagi.", "details": null }` (no header, malformed, bad or expired token, inactive or missing user, or a token issued before the last password change) |
 
 ### `PATCH /api/me/password`
@@ -196,7 +196,7 @@ Owner only (`member.manage`). Query: `page` (default 1) and `pageSize` (1 to 100
 
 | Status | Body |
 | ------ | ---- |
-| 200 | `{ "items": [{ "id", "name", "email", "role", "isActive", "lastLoginAt", "allWarehouses", "warehouses": [{ "id", "code" }] }], "total", "page", "pageSize", "usage": { "used", "limit" } }`. `usage` is the member indicator (BL20): active users (the Owner included, inactive members and pending invitations not) against the effective member limit. `warehouses` holds the assigned active warehouses (ordered by code); an Owner has `allWarehouses: true` and an empty list. No password hash and no reset columns |
+| 200 | `{ "items": [{ "id", "name", "email", "role", "isActive", "isDemo", "lastLoginAt", "allWarehouses", "warehouses": [{ "id", "code" }] }], "total", "page", "pageSize", "usage": { "used", "limit" } }`. `usage` is the member indicator (BL20): active users (the Owner included, inactive members and pending invitations not) against the effective member limit. `warehouses` holds the assigned active warehouses (ordered by code); an Owner has `allWarehouses: true` and an empty list. `isDemo` is `true` for a shared demo account (BL31), so the app hides the refused actions. No password hash and no reset columns |
 
 ### `PATCH /api/members/:id`
 
