@@ -8,7 +8,7 @@ The project exists to prove five things:
 - a transfer between warehouses is atomic;
 - a repeated request does not repeat its effect (idempotency);
 - one tenant can never read or change another tenant's data;
-- a subscription and payment flow works (Xendit sandbox, milestone M2).
+- a subscription and payment flow (Xendit sandbox) is planned for milestone M2.
 
 A sibling implementation of the same product (Next.js, TypeScript, Prisma) lives in `i-adharul/simpul-stok`. This repository builds the same product with Express and Sequelize.
 
@@ -19,7 +19,7 @@ Milestone M1 (core inventory) is complete and deployed.
 - Demo (client): https://simpulstok.adharul.my.id
 - API: https://simpulstok-api.adharul.my.id (`GET /api/health` shows the running commit)
 - Plan limits (BL20) are enforced in the server and shown in the client: creating or restoring a warehouse or product, inviting a member and accepting an invitation answer `PLAN_LIMIT_REACHED` (403) above the plan limit.
-- Server tests: 150 suites, 2478 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-10). The client builds with `cd client && npm run build`. There is no CI.
+- Server tests: 157 suites, 2639 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-11). The client builds with `cd client && npm run build`. There is no CI.
 
 **Open follow-up:** the full P0 flow has **not** yet been verified end to end in production. The deployed API and client are live, but the main-flow test (E6-03) only runs against a local database.
 
@@ -71,7 +71,7 @@ Start with [docs/README.md](docs/README.md). Architecture decisions are in [docs
 
 ## Payments
 
-Payments are sandbox only. No real money moves.
+Payments are not built yet (milestone M2). Once built, they will be sandbox only, and no real money will move.
 
 ## AI-assisted development
 
