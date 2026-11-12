@@ -21,7 +21,7 @@ Milestone M1 (core inventory) is complete and deployed.
 - Plan limits (BL20) are enforced in the server and shown in the client: creating or restoring a warehouse or product, inviting a member and accepting an invitation answer `PLAN_LIMIT_REACHED` (403) above the plan limit.
 - Server tests: 157 suites, 2639 tests, all passing against a local Postgres (`cd server && npm test`, last run 2026-11-11). The client builds with `cd client && npm run build`. There is no CI.
 
-**Open follow-up:** the full P0 flow has **not** yet been verified end to end in production. The deployed API and client are live, but the main-flow test (E6-03) only runs against a local database.
+The full P0 flow was verified end to end in production with the three demo accounts (Owner, Warehouse Admin and Viewer) on 2026-11-11; the repeated-request check (same Idempotency-Key) was run on 2026-11-12.
 
 Not built yet: the subscription and payment flow (M2) and later milestones.
 
